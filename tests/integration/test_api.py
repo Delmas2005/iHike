@@ -1,4 +1,4 @@
-"""The HTTP API, through FastAPI's TestClient, with the engine on simulated services."""
+"""The HTTP API, through FastAPI's TestClient, with the planner on simulated services."""
 from __future__ import annotations
 
 import io
@@ -7,7 +7,8 @@ import pytest
 from fakes import node
 from PIL import Image
 
-import ai
+from ihike import ai, geo, gpx
+
 
 
 def test_interface_and_static_files_are_served(client):
@@ -198,10 +199,10 @@ def test_share_rejects_bad_routes(client, geometry, status):
 
 
 def test_import_gpx_and_list(client, store, tmp_path):
-    track = store.build_track(GEOMETRY)
+    track = geo.build_track(GEOMETRY)
     track["name"] = "A · Test"
-    gpx = open(store.write_gpx(track, tmp_path), "rb").read()
-    r = client.post("/api/import", files={"gpx": ("t.gpx", gpx, "application/gpx+xml")},
+    content = open(gpx.write_gpx(track, tmp_path), "rb").read()
+    r = client.post("/api/import", files={"gpx": ("t.gpx", content, "application/gpx+xml")},
                     data={"title": "Imported", "notes": "", "dog": "No", "camping": "No", "photos": "not json"})
     assert r.status_code == 200 and r.json()["title"] == "Imported"
     bad = client.post("/api/import", files={"gpx": ("t.gpx", b"<gpx></gpx>", "application/gpx+xml")})

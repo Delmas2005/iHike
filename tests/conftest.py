@@ -1,7 +1,7 @@
 """Test set-up: no network, no keys, no models.
 
-The engine reads its configuration and creates its data folders at import time, so the
-environment and the working directory are set here, before any test imports it.
+`ihike.config` reads the environment at import time, and the community store lives in
+folders relative to the working directory, so both are set here before any test imports iHike.
 """
 from __future__ import annotations
 
@@ -21,12 +21,13 @@ os.environ["ORS_API_KEY"] = "test-key"
 for name in ("HF_TOKEN", "HIKES_DATASET"):
     os.environ.pop(name, None)
 _WORKDIR = tempfile.mkdtemp(prefix="ihike-tests-")
-os.chdir(_WORKDIR)  # data/ and pending_photos/ are created relative to the working directory
+os.chdir(_WORKDIR)  # data/ and pending_photos/ are relative to the working directory
 
 import requests  # noqa: E402
 
-import engine as _engine  # noqa: E402
 from fakes import FakeWeb  # noqa: E402
+
+from ihike import community, geo  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -40,13 +41,8 @@ def no_network(monkeypatch):
 
 
 @pytest.fixture
-def engine():
-    return _engine
-
-
-@pytest.fixture
 def web(monkeypatch):
-    fake = FakeWeb(_engine.haversine_km)
+    fake = FakeWeb(geo.haversine_km)
     monkeypatch.setattr(requests, "get", fake.get)
     monkeypatch.setattr(requests, "post", fake.post)
     return fake
@@ -55,17 +51,17 @@ def web(monkeypatch):
 @pytest.fixture
 def store():
     """An empty community store for the test."""
-    _engine.HIKES_FILE.unlink(missing_ok=True)
-    for folder in (_engine.PHOTOS_DIR, _engine.PENDING_DIR):
+    community.HIKES_FILE.unlink(missing_ok=True)
+    for folder in (community.PHOTOS_DIR, community.PENDING_DIR):
         shutil.rmtree(folder, ignore_errors=True)
-        folder.mkdir(parents=True)
-    return _engine
+    community.ensure_folders()
+    return community
 
 
 @pytest.fixture
 def client(web, store):
     from fastapi.testclient import TestClient
 
-    import app as server
+    from ihike.web import app
 
-    return TestClient(server.app)
+    return TestClient(app)
