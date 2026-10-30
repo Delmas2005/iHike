@@ -1,34 +1,32 @@
 """Test set-up: no network, no keys, no models.
 
-`ihike.config` reads the environment at import time, and the community store lives in
-folders relative to the working directory, so both are set here before any test imports iHike.
+`ihike.config` reads the environment at import time, so it is set here before any test
+imports iHike. The community store is redirected to a temporary folder.
 """
 
 from __future__ import annotations
 
 import os
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-os.environ["ORS_API_KEY"] = "test-key"
+os.environ["ORS_API_KEY"] = "test-key"  # pragma: allowlist secret - a dummy value, never sent anywhere
 for name in ("HF_TOKEN", "HIKES_DATASET"):
     os.environ.pop(name, None)
-_WORKDIR = tempfile.mkdtemp(prefix="ihike-tests-")
-os.chdir(_WORKDIR)  # data/ and pending_photos/ are relative to the working directory
 
 import requests  # noqa: E402
 
 from fakes import FakeWeb  # noqa: E402
-
 from ihike import community, geo  # noqa: E402
+
+_STORE = Path(tempfile.mkdtemp(prefix="ihike-tests-"))
+community.DATA_DIR = _STORE / "data"
+community.HIKES_FILE = community.DATA_DIR / "hikes.jsonl"
+community.PHOTOS_DIR = community.DATA_DIR / "photos"
+community.PENDING_DIR = _STORE / "pending_photos"
 
 
 @pytest.fixture(autouse=True)
