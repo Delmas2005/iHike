@@ -1,8 +1,6 @@
 # CPU builds of PyTorch (the Space has no GPU): much smaller than the default CUDA build
 --extra-index-url https://download.pytorch.org/whl/cpu
 requests
-pandas
-folium
 defusedxml
 pillow
 python-multipart

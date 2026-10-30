@@ -51,7 +51,7 @@ Priorities:
 
 13. **`engine.py` is 1,450 lines with eight responsibilities.** Places, routing, Overpass, weather, recommendation, LLM briefing, JSON shaping and storage share one module and its global state. *Refactoring proposal before Phase 1; nothing moves without approval.*
 
-14. **`classic.py` duplicates presentation logic** and uses `from engine import *`. It is a fallback that few people will use; keeping it costs tests and maintenance. *Decision: keep, freeze, or remove.*
+14. ~~**`classic.py` duplicates presentation logic.**~~ Removed: the Gradio fallback is gone, with Folium and pandas.
 
 15. **Logging is `print()`.** 14 calls across the modules, no levels, no request context. *Phase 3: `logging` with levels, no personal data (no coordinates of users' homes, no free text).*
 

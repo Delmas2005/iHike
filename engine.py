@@ -1,7 +1,6 @@
 """iHike engine - everything that is not interface: places, routes, ideas, weather, storage.
 
-The web interface (app.py + static/) and the classic Gradio interface (classic.py)
-both call plan_hikes() and the storage helpers below.
+The web server (app.py) calls plan_hikes() and the storage helpers below.
 
 Architecture, in the order a request flows through it:
   1. geocode()         place name -> coordinates            (Photon, then OpenRouteService)
@@ -59,7 +58,6 @@ LEVELS = {
     "Experienced": {"flat_kmh": 5.5, "up_mh": 500, "down_mh": 800},
 }
 ACTIVITY_SPEED = {"Hiking": 1.0, "Trail running": 1.8}
-TRIP_TYPES = ["Suggest hikes from here", "Out and back (A → B → A)", "One way (A → B)"]
 EFFORT_LIMITS = {"Beginner": 16, "Intermediate": 25, "Experienced": 40}  # effort-km worth trying per level
 NETWORKS = {"iwn": "international", "nwn": "national", "rwn": "regional", "lwn": "local"}
 
@@ -71,7 +69,6 @@ SAC_LABELS = {0: "not graded on the map", 1: "T1 hiking", 2: "T2 mountain hiking
 GRADES = ["Easy", "Moderate", "Hard", "Very hard", "Alpine"]
 # What we are willing to recommend to each level: (hardest path grade, hardest overall grade)
 LEVEL_LIMITS = {"Beginner": (2, "Moderate"), "Intermediate": (3, "Hard"), "Experienced": (4, "Very hard")}
-DAY_CHOICES = ["Today", "Tomorrow", "In 2 days", "In 3 days", "In 4 days", "In 5 days", "In 6 days"]
 VARIANT_COLORS = ["#C2702D", "#2F6B4F", "#3E6A8A", "#7A4A6B"]  # ochre, forest, slate, plum
 MAX_GPX_BYTES = 5 * 1024 * 1024
 

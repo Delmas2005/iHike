@@ -8,10 +8,9 @@ This document describes the code as of the import into Git (October 2026). Known
 
 | File | Lines | Role |
 |---|---|---|
-| `app.py` | ~220 | FastAPI server. Serves the interface, the JSON API, community photos, and mounts the classic Gradio view at `/classic`. Maps engine errors to HTTP status codes. Starts Uvicorn on port 7860. |
+| `app.py` | ~210 | FastAPI server. Serves the interface, the JSON API and community photos. Maps engine errors to HTTP status codes. Starts Uvicorn on port 7860. |
 | `engine.py` | ~1,450 | Everything that is not interface: place search, routing, hike ideas, weather, alerts, recommendation, LLM briefing, GPX, community storage and photo storage. Also builds the JSON sent to the browser. |
 | `ai.py` | ~400 | Models that run inside the Space: speech to text (faster-whisper), plants and animals in photos (BioCLIP via open_clip), and the request reader (`parse_request` rules, `_llm_parse`, `_clean`, `understand`). |
-| `classic.py` | ~280 | The original Gradio interface (forms, Folium map, Markdown summary), kept as a fallback. Calls the same `engine.plan_hikes()`. |
 | `static/index.html`, `static/app.js`, `static/styles.css` | ~1,700 | The main interface: vanilla JavaScript, no build step. 3D relief map with MapLibre GL and contour lines with maplibre-contour (both vendored in `static/vendor/`). |
 
 ### Inside `engine.py`
@@ -124,4 +123,4 @@ All configuration comes from environment variables; see [`.env.example`](../.env
 
 ## Deployment
 
-The Space uses the `gradio` SDK (`sdk_version: 5.49.1` in `README.md`) and runs `python app.py`. `app.py` starts its own Uvicorn server on `GRADIO_SERVER_PORT` (7860). Gradio's server-side rendering is turned off for the `/classic` mount, because its Node server takes port 7861 and rewrites `PORT` in the process environment.
+The Space uses the `gradio` SDK (`sdk_version: 5.49.1` in `README.md`) and runs `python app.py`. The code no longer imports Gradio: `app.py` starts its own Uvicorn server on `GRADIO_SERVER_PORT` (7860). The original Gradio interface (`classic.py`) was removed after the import; see the changelog.

@@ -17,6 +17,10 @@ def test_interface_and_static_files_are_served(client):
     assert client.get("/static/vendor/maplibre-gl.js").status_code == 200
 
 
+def test_classic_gradio_view_is_gone(client):
+    assert client.get("/classic/").status_code == 404
+
+
 def test_config_reports_features(client):
     cfg = client.get("/api/config").json()
     assert set(cfg) >= {"routing", "ai_briefing", "persistence", "voice", "species"}

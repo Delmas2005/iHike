@@ -34,7 +34,7 @@ The app starts with none of these set and tells you what is switched off.
 
 ## How it is built
 
-- `app.py`: the web server (FastAPI). Serves the interface, the `/api/...` endpoints and the classic Gradio view at `/classic`.
+- `app.py`: the web server (FastAPI). Serves the interface and the `/api/...` endpoints.
 - `engine.py`: places, routes, hike ideas, weather, alerts and the community store.
 - `ai.py`: models that run inside the Space on its CPU: Whisper for voice requests, BioCLIP for plants and animals in photos, and a request reader (rules, refined by an LLM when `HF_TOKEN` is set).
 - `static/`: the interface (HTML, CSS, JavaScript) with a 3D relief map (MapLibre) and contour lines (maplibre-contour), both bundled in `static/vendor/`.

@@ -4,7 +4,6 @@ This file is the web server:
   /                 the iHike interface (static/index.html + static/app.js)
   /api/...          JSON endpoints used by that interface
   /photos/<file>    community photos
-  /classic          the original Gradio interface, kept as a fallback and as an API
 
 The planning logic lives in engine.py, the in-Space AI models in ai.py.
 """
@@ -14,7 +13,6 @@ import os
 import tempfile
 from pathlib import Path
 
-import gradio as gr
 import requests
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -23,7 +21,6 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import ai
-import classic
 import engine
 from engine import PlannerError
 
@@ -201,7 +198,7 @@ MISSING_STATIC = """<!doctype html><meta charset="utf-8"><title>iHike - setup</t
 <h1>The interface files are missing</h1>
 <p>The Space has no <code>static/</code> folder, or it is incomplete. Upload the whole <code>static</code> folder
 (with <code>index.html</code>, <code>app.js</code>, <code>styles.css</code> and <code>vendor/</code> inside) next to
-<code>app.py</code>.</p><p>The classic interface still works: <a href="/classic/">open it</a>.</p></body>"""
+<code>app.py</code>.</p></body>"""
 
 
 @api.get("/", include_in_schema=False)
@@ -215,9 +212,7 @@ if STATIC.is_dir():
     api.mount("/static", StaticFiles(directory=STATIC), name="static")
 else:  # never crash the whole Space over a missing folder: say what is wrong instead
     print("WARNING: the static/ folder is missing - upload it next to app.py. Serving a setup page at /.")
-# ssr_mode=False: Gradio's server-side rendering starts a second (Node) server on port 7861
-# and rewrites PORT, which collides with this server. The classic view does not need it.
-app = gr.mount_gradio_app(api, classic.demo, path="/classic", ssr_mode=False)
+app = api
 
 if __name__ == "__main__":
     # Hugging Face sends visitors to port 7860 (GRADIO_SERVER_PORT on Gradio Spaces).
