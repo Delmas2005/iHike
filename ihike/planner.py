@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from . import community
 from .advice import ai_briefing, fallback_briefing, recommend, suits
 from .alerts import alert_data, terrain_alerts, weather_alerts
-from . import community
 from .community import nearby_hikes, public_hike
 from .config import ACTIVITY_SPEED, HF_TOKEN, HIKES_DATASET, LEVELS, ORS_API_KEY, VARIANT_COLORS, require_ors
 from .errors import PlannerError
@@ -12,12 +12,18 @@ from .places import geocode
 from .routing import plan_variants
 from .weather import get_weather
 
-
 MODES = ("ideas", "out_and_back", "one_way")
 
 
 def plan_hikes(
-    start_text, mode="ideas", end_text="", activity="Hiking", level="Beginner", hours=3.0, day_index=0, kinds=None
+    start_text: str,
+    mode: str = "ideas",
+    end_text: str = "",
+    activity: str = "Hiking",
+    level: str = "Beginner",
+    hours: float = 3.0,
+    day_index: int = 0,
+    kinds: set[str] | None = None,
 ) -> dict:
     """Plan from a start (and a destination unless mode == "ideas"). Raises PlannerError.
 
@@ -35,7 +41,9 @@ def plan_hikes(
         s_lat, s_lon, s_label, s_others = geocode(start_text)
         if not in_europe(s_lat, s_lon):
             raise PlannerError("The start point is outside Europe, which is the only area covered for now.")
-    end, e_label, e_others = None, "", []
+    end: tuple[float, float] | None = None
+    e_label = ""
+    e_others: list[str] = []
     out_and_back = mode == "out_and_back"
     if mode != "ideas":
         e_lat, e_lon, e_label, e_others = geocode(end_text)
@@ -43,10 +51,14 @@ def plan_hikes(
             raise PlannerError("The destination is outside Europe.")
         end = (e_lat, e_lon)
 
-    tracks, trails, note, hints = [], [], "", []
+    tracks: list[dict] | None = []
+    trails: list[dict] | None = []
+    hints: list[str] = []
+    note = ""
     if auto_start:
         # No start given: find where people leave the car and offer an easy, a medium and a hard way.
         require_ors()
+        assert end is not None  # auto_start implies a destination trip
         tracks = plan_from_car_parks(end, e_label, hours, level, activity, out_and_back)
         first = tracks[0]["start_point"]
         s_lat, s_lon, s_label, s_others = first["lat"], first["lon"], first["label"], []
@@ -133,7 +145,14 @@ def plan_hikes(
     }
 
 
-def track_data(t: dict, level: str, rec=None, max_points=1500, title=None, kind=None) -> dict:
+def track_data(
+    t: dict,
+    level: str,
+    rec: dict | None = None,
+    max_points: int = 1500,
+    title: str | None = None,
+    kind: str | None = None,
+) -> dict:
     eles = t["eles"] or [None] * len(t["latlon"])
     pts = decimate(list(zip(t["latlon"], eles)), max_points)
     name = t.get("name", "")
@@ -175,7 +194,7 @@ def _names(t: dict, result: dict) -> dict:
     many = len(result["tracks"]) > 1
     if result["end"]:
         where = result["end"]["label"].split(",")[0]
-        kind = _KIND_TEXT.get(t.get("kind"), t.get("kind", ""))
+        kind = _KIND_TEXT.get(t.get("kind", ""), t.get("kind", ""))
         return {"title": where, "kind": f"{kind}, {variant.lower()} way" if many else kind}
     return {
         "title": {

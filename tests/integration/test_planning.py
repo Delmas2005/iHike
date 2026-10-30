@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 import requests
-from fakes import HOME, START, SUMMIT, node
 
+from fakes import HOME, START, SUMMIT, node
 from ihike import community, errors, geo, osm, planner
 
 SASSIERE = ("45.4885, 6.968", "45.50472, 6.99972")
@@ -168,7 +168,7 @@ def test_goals_and_trails_are_read_from_overpass(web):
         "Trop Loin",
         "Lac Bleu",
     }
-    assert [g["ele"] for g in goals if g["kind"] == "summit"][0] == 1840.0
+    assert next(g["ele"] for g in goals if g["kind"] == "summit") == 1840.0
     assert [len(t["ways"]) for t in trails] == [0, 4]
 
 

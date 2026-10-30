@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import os
 import threading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 SPECIES_MODEL = os.environ.get("SPECIES_MODEL", "hf-hub:imageomics/bioclip").strip()
 
@@ -157,7 +161,7 @@ _bioclip = None
 _bioclip_lock = threading.Lock()
 
 
-def _load_bioclip():
+def _load_bioclip() -> tuple:
     global _bioclip
     if _bioclip is None:
         import open_clip
@@ -174,7 +178,7 @@ def _load_bioclip():
     return _bioclip
 
 
-def identify(image) -> dict:
+def identify(image: Image.Image) -> dict:
     """PIL image -> {"verdict": "match" | "unsure" | "none", "species": [{name, scientific, group, score}]}."""
     with _bioclip_lock:
         model, preprocess, text, torch = _load_bioclip()

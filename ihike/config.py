@@ -4,7 +4,6 @@ import os
 
 from .errors import PlannerError
 
-
 ORS_API_KEY = os.environ.get("ORS_API_KEY", "").strip()  # secret
 HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()  # secret
 HIKES_DATASET = os.environ.get("HIKES_DATASET", "").strip()  # variable, e.g. "user/monarch-hikes"
@@ -57,6 +56,6 @@ LEVEL_LIMITS = {"Beginner": (2, "Moderate"), "Intermediate": (3, "Hard"), "Exper
 VARIANT_COLORS = ["#C2702D", "#2F6B4F", "#3E6A8A", "#7A4A6B"]  # ochre, forest, slate, plum
 
 
-def require_ors():
+def require_ors() -> None:
     if not ORS_API_KEY:
         raise PlannerError("The routing key is missing: add ORS_API_KEY in the Space secrets.")

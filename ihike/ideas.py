@@ -3,13 +3,22 @@ from __future__ import annotations
 from .advice import suits
 from .config import ACTIVITY_SPEED, EFFORT_LIMITS, LEVELS, VARIANT_COLORS
 from .errors import PlannerError
-from .geo import estimate_hours, haversine_km, path_km, stitch_ways
+from .geo import Point, estimate_hours, haversine_km, path_km, stitch_ways
 from .osm import find_goals_and_trails, find_trailheads
 from .routing import _from_ors, _make_track, ors_route
 from .weather import get_elevations
 
 
-def pick_goals(goals, start, start_ele, hours, level, activity, limit=5, kinds=None) -> list[dict]:
+def pick_goals(
+    goals: list[dict],
+    start: Point,
+    start_ele: float | None,
+    hours: float,
+    level: str,
+    activity: str,
+    limit: int = 5,
+    kinds: set[str] | None = None,
+) -> list[dict]:
     """Keep the goals whose out-and-back roughly fills the wished time, with some variety.
 
     `kinds` (e.g. {"lake", "hut"}) narrows the choice when the hiker asked for something specific.
@@ -29,7 +38,7 @@ def pick_goals(goals, start, start_ele, hours, level, activity, limit=5, kinds=N
         scored.append((abs(est - hours * 0.9), g))
     scored.sort(key=lambda x: x[0])
 
-    chosen = []
+    chosen: list[dict] = []
     for _, g in scored:
         same_kind = sum(1 for c in chosen if c["kind"] == g["kind"])
         too_close = any(haversine_km((c["lat"], c["lon"]), (g["lat"], g["lon"])) < 0.5 for c in chosen)
@@ -40,7 +49,9 @@ def pick_goals(goals, start, start_ele, hours, level, activity, limit=5, kinds=N
     return chosen
 
 
-def marked_loops(trails, start, hours, level, activity, limit=2) -> list[dict]:
+def marked_loops(
+    trails: list[dict], start: Point, hours: float, level: str, activity: str, limit: int = 2
+) -> list[dict]:
     """Waymarked circular trails that pass near the start and fit in the wished time."""
     loops = []
     for trail in trails:
@@ -67,7 +78,7 @@ def marked_loops(trails, start, hours, level, activity, limit=2) -> list[dict]:
                 "score": abs(length / LEVELS[level]["flat_kmh"] - hours),
             }
         )
-    return sorted(loops, key=lambda l: l["score"])[:limit]
+    return sorted(loops, key=lambda loop: loop["score"])[:limit]
 
 
 KIND_PLURAL = {
@@ -80,7 +91,9 @@ KIND_PLURAL = {
 }
 
 
-def out_of_reach_hint(goals, chosen, start, kinds, hours, level) -> str:
+def out_of_reach_hint(
+    goals: list[dict], chosen: list[dict], start: Point, kinds: set[str] | None, hours: float, level: str
+) -> str:
     """When the hiker asked for lakes (say) and none fits, name the closest ones instead of staying silent."""
     wanted = [k for k in (kinds or []) if k in KIND_PLURAL]
     if not wanted or any(g["kind"] in wanted for g in chosen):
@@ -97,7 +110,14 @@ def out_of_reach_hint(goals, chosen, start, kinds, hours, level) -> str:
     )
 
 
-def suggest_hikes(start, hours, level, activity, kinds=None, hints=None):
+def suggest_hikes(
+    start: Point,
+    hours: float,
+    level: str,
+    activity: str,
+    kinds: set[str] | None = None,
+    hints: list[str] | None = None,
+) -> tuple[list[dict] | None, list[dict] | None]:
     """Real hike ideas from `start`. Returns (tracks, trails) - tracks is [] when nothing was found,
     and both are None when OpenStreetMap could not be queried."""
     reach_km = hours * LEVELS[level]["flat_kmh"] * ACTIVITY_SPEED[activity] / 2
@@ -136,7 +156,7 @@ def suggest_hikes(start, hours, level, activity, kinds=None, hints=None):
         )
         tracks.append(track)
 
-    for loop in [] if kinds and "loop" not in kinds else marked_loops(trails, start, hours, level, activity):
+    for loop in [] if kinds and "loop" not in kinds else marked_loops(trails or [], start, hours, level, activity):
         try:
             features = ors_route([[p[1], p[0]] for p in loop["waypoints"]])
         except PlannerError:
@@ -157,7 +177,9 @@ def suggest_hikes(start, hours, level, activity, kinds=None, hints=None):
     return tracks, trails
 
 
-def plan_from_car_parks(end, end_label, hours, level, activity, out_and_back=True) -> list[dict]:
+def plan_from_car_parks(
+    end: Point, end_label: str, hours: float, level: str, activity: str, out_and_back: bool = True
+) -> list[dict]:
     """Routes to `end` from the car parks and trailheads around it: the easiest, a middle one, the hardest."""
     places = find_trailheads(end[0], end[1], radius_m=9000, limit=24, order="distance")
     if places is None:
@@ -202,7 +224,7 @@ def plan_from_car_parks(end, end_label, hours, level, activity, out_and_back=Tru
     tracks = [t for t in tracks if t["distance_km"] >= 1.0] or tracks
     reaching = [t for t in tracks if t["end_gap_km"] <= 0.5] or sorted(tracks, key=lambda t: t["end_gap_km"])[:1]
     reaching.sort(key=lambda t: t["effort"])
-    distinct = []  # two car parks side by side give the same hike: keep one
+    distinct: list[dict] = []  # two car parks side by side give the same hike: keep one
     for t in reaching:
         if all(abs(t["effort"] - d["effort"]) > max(1.0, 0.08 * d["effort"]) for d in distinct):
             distinct.append(t)

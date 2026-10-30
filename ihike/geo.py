@@ -1,18 +1,23 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
+from typing import TypeVar, cast
 
 from .config import ACTIVITY_SPEED, EUROPE, GRADES, LEVELS, SAC_LABELS
 
+Point = Sequence[float]  # (lat, lon), or [lat, lon, ...] as read from JSON
+T = TypeVar("T")
 
-def haversine_km(a, b) -> float:
+
+def haversine_km(a: Point, b: Point) -> float:
     """Distance between two (lat, lon) points."""
     lat1, lon1, lat2, lon2 = map(math.radians, (a[0], a[1], b[0], b[1]))
     h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
     return 6371.0 * 2 * math.asin(math.sqrt(h))
 
 
-def climb(eles, threshold=5.0):
+def climb(eles: Sequence[float], threshold: float = 5.0) -> tuple[float, float]:
     """Total ascent/descent, ignoring wiggles under `threshold` metres (GPS noise)."""
     up = down = 0.0
     ref = eles[0]
@@ -25,18 +30,18 @@ def climb(eles, threshold=5.0):
     return up, down
 
 
-def decimate(points, max_n):
+def decimate(points: list[T], max_n: int) -> list[T]:
     if len(points) <= max_n:
         return list(points)
     step = (len(points) - 1) / (max_n - 1)
     return [points[round(i * step)] for i in range(max_n)]
 
 
-def in_europe(lat, lon) -> bool:
+def in_europe(lat: float, lon: float) -> bool:
     return EUROPE["min_lat"] <= lat <= EUROPE["max_lat"] and EUROPE["min_lon"] <= lon <= EUROPE["max_lon"]
 
 
-def estimate_hours(dist_km, ascent_m, descent_m, level, activity) -> float:
+def estimate_hours(dist_km: float, ascent_m: float, descent_m: float, level: str, activity: str) -> float:
     """DIN 33466-style estimate: the longer of horizontal/vertical time plus half the shorter."""
     pace, k = LEVELS[level], ACTIVITY_SPEED[activity]
     t_h = dist_km / (pace["flat_kmh"] * k)
@@ -55,7 +60,13 @@ def grade_for(effort_km: float) -> str:
     return "Very hard"
 
 
-def build_track(coords, distance_m=None, ascent=None, descent=None, sac=0) -> dict:
+def build_track(
+    coords: list,
+    distance_m: float | None = None,
+    ascent: float | None = None,
+    descent: float | None = None,
+    sac: int = 0,
+) -> dict:
     """Turn [[lon, lat, ele?], ...] into a track with its statistics.
 
     `sac` is the hardest path grade met on the way (0 = unknown). The final grade is the
@@ -63,7 +74,7 @@ def build_track(coords, distance_m=None, ascent=None, descent=None, sac=0) -> di
     """
     latlon = [(c[1], c[0]) for c in coords]
     raw_eles = [c[2] if len(c) > 2 else None for c in coords]
-    eles = raw_eles if all(e is not None for e in raw_eles) else None
+    eles = cast("list[float]", raw_eles) if all(e is not None for e in raw_eles) else None
 
     km = [0.0]
     for a, b in zip(latlon, latlon[1:]):
@@ -92,17 +103,20 @@ def build_track(coords, distance_m=None, ascent=None, descent=None, sac=0) -> di
     }
 
 
-def path_km(points) -> float:
+def path_km(points: Sequence[Point]) -> float:
     return sum(haversine_km(a, b) for a, b in zip(points, points[1:]))
 
 
-def stitch_ways(ways):
+def stitch_ways(ways: list[list[Point]]) -> tuple[list[Point], float]:
     """Join a trail's pieces end to end. Returns (ordered points, share of the total length used)."""
     pieces = [list(w) for w in ways if len(w) >= 2]
     if not pieces:
         return [], 0.0
     total = sum(path_km(w) for w in pieces) or 1.0
-    touch = lambda a, b: haversine_km(a, b) < 0.02
+
+    def touch(a: Point, b: Point) -> bool:
+        return haversine_km(a, b) < 0.02
+
     chain = pieces.pop(0)
     grew = True
     while pieces and grew:

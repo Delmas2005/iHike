@@ -3,13 +3,13 @@ from __future__ import annotations
 import difflib
 import re
 import unicodedata
+from typing import Any
 
 import requests
 
 from .config import EUROPE, ORS_API_KEY, ORS_URL, PHOTON_URL, USER_AGENT
 from .errors import PlannerError
 from .geo import in_europe
-
 
 _NUMBER = r"[-+]?\d+(?:[.,]\d+)?"
 _DMS = re.compile(r"""(\d{1,3})\s*°\s*(\d{1,2})\s*['′’]\s*(\d{1,2}(?:[.,]\d+)?)\s*(?:"|″|”|'')?\s*([NSEW])""")
@@ -38,7 +38,7 @@ _STOPWORDS = {
 }
 
 
-def parse_coordinates(text: str):
+def parse_coordinates(text: str) -> tuple[float, float] | None:
     """Read coordinates in the formats people actually paste. Returns (lat, lon) or None.
 
     Accepted: '45.4897, 6.9853' · '45.4897 6.9853' · '45,4897 6,9853' · '45.4897° N, 6.9853° E'
@@ -93,15 +93,16 @@ def search_places(text: str) -> list[tuple]:
     """Candidate places as (lat, lon, label), from Photon first and ORS as a second opinion."""
     found = []
     try:
+        params: dict[str, Any] = {
+            "q": text,
+            "limit": 6,
+            "lang": "en",
+            "bbox": f"{EUROPE['min_lon']},{EUROPE['min_lat']},{EUROPE['max_lon']},{EUROPE['max_lat']}",
+        }
         resp = requests.get(
             PHOTON_URL,
             timeout=15,
-            params={
-                "q": text,
-                "limit": 6,
-                "lang": "en",
-                "bbox": f"{EUROPE['min_lon']},{EUROPE['min_lat']},{EUROPE['max_lon']},{EUROPE['max_lat']}",
-            },
+            params=params,
             headers=USER_AGENT,
         )
         if resp.status_code == 200:
@@ -133,7 +134,7 @@ def search_places(text: str) -> list[tuple]:
     return found
 
 
-def geocode(text: str):
+def geocode(text: str) -> tuple[float, float, str, list[str]]:
     """Accepts a place name or coordinates. Returns (lat, lon, label, other_matches)."""
     text = (text or "").strip()
     if not text:

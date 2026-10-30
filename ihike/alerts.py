@@ -3,10 +3,11 @@ from __future__ import annotations
 import re
 
 from .config import SAC_LABELS
+from .geo import Point
 from .weather import ICE_CODES, SNOW_CODES, STORM_CODES, get_elevations
 
 
-def terrain_alerts(tracks, end=None) -> list[str]:
+def terrain_alerts(tracks: list[dict], end: Point | None = None) -> list[str]:
     """Warnings that come from the ground, not the sky."""
     alerts = []
     hardest = max(t["sac"] for t in tracks)
@@ -53,7 +54,7 @@ def terrain_alerts(tracks, end=None) -> list[str]:
     return alerts
 
 
-def weather_alerts(w, longest_hours: float) -> list[str]:
+def weather_alerts(w: dict | None, longest_hours: float) -> list[str]:
     if not w:
         return []
     alerts = []

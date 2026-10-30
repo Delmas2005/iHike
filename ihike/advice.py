@@ -5,12 +5,12 @@ import json
 from .config import GRADES, HF_TOKEN, LEVEL_LIMITS, LLM_MODEL
 
 
-def suits(track, level) -> bool:
+def suits(track: dict, level: str) -> bool:
     max_sac, max_grade = LEVEL_LIMITS[level]
     return track["sac"] <= max_sac and GRADES.index(track["grade"]) <= GRADES.index(max_grade)
 
 
-def recommend(tracks, level, hours):
+def recommend(tracks: list[dict], level: str, hours: float) -> dict | None:
     """The suitable variant closest to the wished duration, or None when nothing suits the level."""
     pool = [t for t in tracks if suits(t, level)]
     return min(pool, key=lambda t: abs(t["hours"] - hours)) if pool else None
@@ -27,7 +27,7 @@ SYSTEM_PROMPT = (
 )
 
 
-def ai_briefing(context: dict):
+def ai_briefing(context: dict) -> str | None:
     if not HF_TOKEN:
         return None
     try:
@@ -49,7 +49,7 @@ def ai_briefing(context: dict):
         return None
 
 
-def fallback_briefing(rec, level, alerts, tracks) -> str:
+def fallback_briefing(rec: dict | None, level: str, alerts: list[str], tracks: list[dict]) -> str:
     if rec is None:
         easiest = tracks[0]
         return (

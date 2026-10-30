@@ -9,7 +9,7 @@ from .geo import haversine_km
 from .weather import get_elevations
 
 
-def overpass(query: str):
+def overpass(query: str) -> list[dict] | None:
     """Run an OpenStreetMap (Overpass) query. Returns the list of elements, or None if unreachable."""
     for url in OVERPASS_URLS:
         try:
@@ -22,7 +22,7 @@ def overpass(query: str):
     return None
 
 
-def _goal_kind(tags: dict):
+def _goal_kind(tags: dict) -> str | None:
     if tags.get("natural") in ("peak", "volcano"):
         return "summit"
     if tags.get("natural") == "saddle" or tags.get("mountain_pass") == "yes":
@@ -48,7 +48,7 @@ def _goal_kind(tags: dict):
     return None
 
 
-def find_goals_and_trails(lat, lon, radius_m):
+def find_goals_and_trails(lat: float, lon: float, radius_m: float) -> tuple[list[dict] | None, list[dict] | None]:
     """Named places worth walking to, and waymarked trails passing by the start.
 
     Returns (goals, trails), or (None, None) when OpenStreetMap could not be queried.
@@ -71,7 +71,9 @@ def find_goals_and_trails(lat, lon, radius_m):
     if elements is None:
         return None, None
 
-    goals, trails, seen = [], {}, set()
+    goals: list[dict] = []
+    trails: dict[int, dict] = {}
+    seen: set = set()
     for el in elements:
         tags = el.get("tags") or {}
         if el.get("type") == "relation" and tags.get("route") in ("hiking", "foot"):
@@ -116,7 +118,9 @@ _URBAN_PARKING = {"underground", "multi-storey", "rooftop", "garage_boxes", "car
 _CLOSED_ACCESS = {"private", "no", "customers", "delivery", "permit"}
 
 
-def find_trailheads(lat: float, lon: float, radius_m: int = 5000, limit: int = 8, order: str = "best"):
+def find_trailheads(
+    lat: float, lon: float, radius_m: int = 5000, limit: int = 8, order: str = "best"
+) -> list[dict] | None:
     """Trailheads and public car parks around a point, best first. None if OpenStreetMap is unreachable."""
     a = f"(around:{int(radius_m)},{lat:.5f},{lon:.5f})"
     elements = overpass(
@@ -136,9 +140,8 @@ def find_trailheads(lat: float, lon: float, radius_m: int = 5000, limit: int = 8
         trailhead = tags.get("highway") == "trailhead"
         if not trailhead and tags.get("amenity") != "parking":
             continue
-        if not trailhead:
-            if tags.get("access") in _CLOSED_ACCESS or tags.get("parking") in _URBAN_PARKING:
-                continue
+        if not trailhead and (tags.get("access") in _CLOSED_ACCESS or tags.get("parking") in _URBAN_PARKING):
+            continue
         name = (tags.get("name") or "").strip()
         key = (round(point["lat"], 3), round(point["lon"], 3))
         if key in seen:
@@ -153,7 +156,7 @@ def find_trailheads(lat: float, lon: float, radius_m: int = 5000, limit: int = 8
                 "lat": round(point["lat"], 6),
                 "lon": round(point["lon"], 6),
                 "away_km": round(haversine_km((lat, lon), (point["lat"], point["lon"])), 1),
-                "fee": {"yes": True, "no": False}.get(tags.get("fee")),
+                "fee": {"yes": True, "no": False}.get(tags.get("fee", "")),
                 "capacity": int(capacity) if capacity.isdigit() else None,
             }
         )

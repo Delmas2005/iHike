@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 import requests
 
@@ -16,22 +17,22 @@ from .config import (
     require_ors,
 )
 from .errors import PlannerError
-from .geo import build_track, estimate_hours, haversine_km
+from .geo import Point, build_track, estimate_hours, haversine_km
 
 
-def _ors_error(resp) -> str:
+def _ors_error(resp: requests.Response) -> str:
     try:
         err = resp.json().get("error")
         if isinstance(err, dict):
             return err.get("message") or str(err)
         if err:
             return str(err)
-    except Exception:
+    except Exception:  # noqa: S110 - an unreadable error body falls back to the status code
         pass
     return f"HTTP {resp.status_code}"
 
 
-def ors_route(coordinates, round_trip=None, alternatives=0) -> list[dict]:
+def ors_route(coordinates: list, round_trip: dict | None = None, alternatives: int = 0) -> list[dict]:
     """One call to ORS hiking directions. Returns GeoJSON features (one per route)."""
     require_ors()
     body = {"coordinates": coordinates, "elevation": True, "instructions": False, "extra_info": ["traildifficulty"]}
@@ -40,7 +41,7 @@ def ors_route(coordinates, round_trip=None, alternatives=0) -> list[dict]:
     if alternatives > 1:
         body["alternative_routes"] = {"target_count": alternatives, "weight_factor": 1.6, "share_factor": 0.6}
 
-    def send():
+    def send() -> requests.Response:
         return requests.post(
             f"{ORS_URL}/v2/directions/foot-hiking/geojson",
             json=body,
@@ -64,28 +65,29 @@ def ors_route(coordinates, round_trip=None, alternatives=0) -> list[dict]:
     return resp.json().get("features") or []
 
 
-def _ors_sac(props) -> int:
+def _ors_sac(props: dict) -> int:
     """Hardest SAC grade met for at least 50 m, from the ORS 'traildifficulty' extra."""
     summary = ((props.get("extras") or {}).get("traildifficulty") or {}).get("summary") or []
     grades = [int(x.get("value", 0)) for x in summary if x.get("distance", 0) >= 50]
     return max((g for g in grades if 1 <= g <= 6), default=0)
 
 
-def brouter_route(start, end):
+def brouter_route(start: Point, end: Point) -> tuple[list[list[float]] | None, int, str | None]:
     """Route with BRouter's alpine hiking profile.
 
     Returns (coords, sac, None) on success, or (None, 0, reason) so the reason can be shown.
     """
     try:
+        params: dict[str, Any] = {
+            "lonlats": f"{start[1]:.6f},{start[0]:.6f}|{end[1]:.6f},{end[0]:.6f}",
+            "profile": "hiking-mountain",
+            "alternativeidx": 0,
+            "format": "geojson",
+        }
         resp = requests.get(
             BROUTER_URL,
             timeout=(5, 20),
-            params={
-                "lonlats": f"{start[1]:.6f},{start[0]:.6f}|{end[1]:.6f},{end[0]:.6f}",
-                "profile": "hiking-mountain",
-                "alternativeidx": 0,
-                "format": "geojson",
-            },
+            params=params,
             headers=USER_AGENT,
         )
         if resp.status_code != 200:
@@ -112,7 +114,7 @@ def brouter_route(start, end):
         return None, 0, f"no answer ({type(exc).__name__})"
 
 
-def _from_ors(feature) -> tuple:
+def _from_ors(feature: dict) -> tuple:
     props = feature.get("properties", {})
     return (
         feature["geometry"]["coordinates"],
@@ -124,7 +126,7 @@ def _from_ors(feature) -> tuple:
     )
 
 
-def _make_track(route, level, activity, end=None, out_and_back=False) -> dict:
+def _make_track(route: tuple, level: str, activity: str, end: Point | None = None, out_and_back: bool = False) -> dict:
     """route = (coords, distance_m, ascent, descent, sac, router) -> a track with its statistics."""
     coords, distance_m, ascent, descent, sac, router = route
     far = (coords[-1][1], coords[-1][0])
@@ -145,7 +147,9 @@ def _make_track(route, level, activity, end=None, out_and_back=False) -> dict:
     return track
 
 
-def plan_variants(start, end, hours, level, activity, out_and_back=False) -> list[dict]:
+def plan_variants(
+    start: Point, end: Point | None, hours: float, level: str, activity: str, out_and_back: bool = False
+) -> list[dict]:
     """start/end are (lat, lon); end=None means a loop. Returns tracks sorted easiest first."""
     routes = []  # (coords, distance_m, ascent, descent, sac, router)
     from_ors = _from_ors

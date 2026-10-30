@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import io
+from pathlib import Path
 
 import pytest
-from fakes import node
 from PIL import Image
 
+from fakes import node
 from ihike import ai, geo, gpx
 
 
@@ -248,7 +249,7 @@ def test_share_rejects_bad_routes(client, geometry, status):
 def test_import_gpx_and_list(client, store, tmp_path):
     track = geo.build_track(GEOMETRY)
     track["name"] = "A · Test"
-    content = open(gpx.write_gpx(track, tmp_path), "rb").read()
+    content = Path(gpx.write_gpx(track, tmp_path)).read_bytes()
     r = client.post(
         "/api/import",
         files={"gpx": ("t.gpx", content, "application/gpx+xml")},

@@ -148,8 +148,8 @@ def parse_request(text: str, today: date | None = None) -> dict:
     m = re.search(r"(\d+(?:[.,]\d+)?)\s*-?\s*(?:h|hr|hrs|hour|hours|heure|heures)\b", t)
     if m:
         out["hours"] = float(m.group(1).replace(",", "."))
-    elif re.search(r"(\d+)\s*(?:min|mins|minutes)\b", t):
-        out["hours"] = round(int(re.search(r"(\d+)\s*(?:min|mins|minutes)\b", t).group(1)) / 60, 1)
+    elif minutes := re.search(r"(\d+)\s*(?:min|mins|minutes)\b", t):
+        out["hours"] = round(int(minutes.group(1)) / 60, 1)
     elif re.search(r"half[- ]day|demi[- ]journee", t):
         out["hours"] = 4.0
     elif re.search(r"full day|whole day|all day|journee|day hike", t):
@@ -182,10 +182,12 @@ def parse_request(text: str, today: date | None = None) -> dict:
             if re.search(r"week[- ]?end", t):
                 out["day"] = 0 if today.weekday() >= 5 else 5 - today.weekday()
 
-    not_places = set(sum(KIND_WORDS.values(), [])) | set(sum(LEVEL_WORDS.values(), [])) | _GENERIC
+    not_places = (
+        {w for ws in KIND_WORDS.values() for w in ws} | {w for ws in LEVEL_WORDS.values() for w in ws} | _GENERIC
+    )
 
-    def usable(place):
-        return place and place not in not_places and not re.fullmatch(r"[\d\s.,h]+", place)
+    def usable(place: str) -> bool:
+        return bool(place) and place not in not_places and not re.fullmatch(r"[\d\s.,h]+", place)
 
     dest = _DEST_RE.search(t)
     dest_span = None
@@ -197,8 +199,8 @@ def parse_request(text: str, today: date | None = None) -> dict:
         named = _NAMED_PLACE.search(t)
         if named:
             place = _clip_place(named.group(1))
-            words = [w for w in re.split(r"[\s\-]+", place) if w and w not in _PARTICLES]
-            if len(words) >= 2 and usable(place):  # "lac" alone is a wish, "lac de crop" is a place
+            name_words = [w for w in re.split(r"[\s\-]+", place) if w and w not in _PARTICLES]
+            if len(name_words) >= 2 and usable(place):  # "lac" alone is a wish, "lac de crop" is a place
                 out["destination"] = place
                 out["mode"] = "one_way" if re.search(r"one[- ]way|aller simple", t) else "out_and_back"
                 dest_span = (named.start(), named.start() + len(place))
@@ -230,7 +232,7 @@ _PARSER_PROMPT = (
 )
 
 
-def _llm_parse(text: str, today: date):
+def _llm_parse(text: str, today: date) -> dict | None:
     if not HF_TOKEN:
         return None
     try:

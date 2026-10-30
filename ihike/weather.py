@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Any
+
 import requests
 
 from .config import ELEVATION_URL, METEO_URL
-
+from .geo import Point
 
 WMO = {
     0: "Clear sky",
@@ -40,9 +43,9 @@ SNOW_CODES = {71, 73, 75, 77, 85, 86}
 ICE_CODES = {48, 56, 57, 66, 67}
 
 
-def get_elevations(points) -> list:
+def get_elevations(points: Sequence[Point]) -> list[float | None]:
     """Ground elevation for a list of (lat, lon), in one request per 100 points. None where unknown."""
-    out = []
+    out: list[float | None] = []
     for i in range(0, len(points), 100):
         chunk = points[i : i + 100]
         try:
@@ -62,7 +65,7 @@ def get_elevations(points) -> list:
     return out
 
 
-def get_weather(lat, lon, day_index: int):
+def get_weather(lat: float, lon: float, day_index: int) -> dict | None:
     """Daily forecast from Open-Meteo. Returns None if the service is unreachable."""
     daily = [
         "weather_code",
@@ -76,16 +79,17 @@ def get_weather(lat, lon, day_index: int):
         "daylight_duration",
     ]
     try:
+        params: dict[str, Any] = {
+            "latitude": round(lat, 4),
+            "longitude": round(lon, 4),
+            "daily": ",".join(daily),
+            "timezone": "auto",
+            "forecast_days": 7,
+        }
         resp = requests.get(
             METEO_URL,
             timeout=20,
-            params={
-                "latitude": round(lat, 4),
-                "longitude": round(lon, 4),
-                "daily": ",".join(daily),
-                "timezone": "auto",
-                "forecast_days": 7,
-            },
+            params=params,
         )
         d = resp.json()["daily"]
         i = min(int(day_index or 0), len(d["time"]) - 1)

@@ -8,12 +8,14 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import NoReturn
 
 import requests
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -28,7 +30,7 @@ MAX_AUDIO_BYTES = 6 * 1024 * 1024
 
 
 @asynccontextmanager
-async def _lifespan(_app: FastAPI):
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     community.init_storage()  # folders, and the community dataset when configured
     yield
 
@@ -36,10 +38,10 @@ async def _lifespan(_app: FastAPI):
 api = FastAPI(title="iHike", version=__version__, docs_url="/api/docs", redoc_url=None, lifespan=_lifespan)
 
 
-def _fail(exc: Exception):
+def _fail(exc: Exception) -> NoReturn:
     """Turn planning errors into clean HTTP answers the interface can show."""
     if isinstance(exc, PlannerError):
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if isinstance(exc, requests.RequestException):
         raise HTTPException(status_code=503, detail="A map service did not answer. Please try again in a minute.")
     raise exc
@@ -60,12 +62,12 @@ class PlanRequest(BaseModel):
 
 
 @api.get("/api/config")
-def config():
+def config() -> dict:
     return {**planner.config_status(), **ai.available()}
 
 
 @api.post("/api/plan")
-def plan(req: PlanRequest):
+def plan(req: PlanRequest) -> dict:
     try:
         result = planner.plan_hikes(
             req.start,
@@ -77,13 +79,13 @@ def plan(req: PlanRequest):
             req.day,
             kinds=set(req.kinds) or None,
         )
-    except Exception as exc:  # noqa: BLE001 - mapped to HTTP errors
+    except Exception as exc:
         _fail(exc)
     return planner.plan_data(result)
 
 
 @api.get("/api/trailheads")
-def trailheads(lat: float, lon: float):
+def trailheads(lat: float, lon: float) -> dict:
     if not (-90 <= lat <= 90 and -180 <= lon <= 180) or not in_europe(lat, lon):
         raise HTTPException(status_code=400, detail="This point is outside Europe.")
     places = find_trailheads(lat, lon)
@@ -97,12 +99,12 @@ class AskRequest(BaseModel):
 
 
 @api.post("/api/ask")
-def ask(req: AskRequest):
+def ask(req: AskRequest) -> dict:
     return ai.understand(req.text)
 
 
 @api.post("/api/voice")
-def voice(audio: UploadFile = File(...)):
+def voice(audio: UploadFile = File(...)) -> dict:
     if not ai.available()["voice"]:
         raise HTTPException(status_code=501, detail="Voice input is not installed on this server.")
     raw = audio.file.read(MAX_AUDIO_BYTES + 1)
@@ -114,9 +116,9 @@ def voice(audio: UploadFile = File(...)):
         tmp.flush()
         try:
             text = ai.transcribe(tmp.name)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print("Voice error:", exc)
-            raise HTTPException(status_code=500, detail="The recording could not be understood.")
+            raise HTTPException(status_code=500, detail="The recording could not be understood.") from exc
     return {"text": text}
 
 
@@ -124,22 +126,22 @@ def voice(audio: UploadFile = File(...)):
 # Community
 # --------------------------------------------------------------------------
 @api.get("/api/hikes")
-def hikes():
+def hikes() -> dict:
     return {"hikes": [community.public_hike(h) for h in reversed(community.load_hikes())]}
 
 
 @api.post("/api/photos")
-def photos(image: UploadFile = File(...)):
+def photos(image: UploadFile = File(...)) -> dict:
     raw = image.file.read(community.MAX_PHOTO_BYTES + 1)
     try:
         photo_id, img = community.save_photo(raw)
     except PlannerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     result = {"verdict": "unavailable", "species": []}
     if ai.available()["species"]:
         try:
             result = ai.identify(img)
-        except Exception as exc:  # noqa: BLE001 - a failed recognition must not lose the photo
+        except Exception as exc:
             print("Species error:", exc)
     return {"id": photo_id, "url": f"/photos/{photo_id}.jpg", "thumb": f"/photos/{photo_id}_s.jpg", **result}
 
@@ -160,7 +162,7 @@ class ShareRequest(BaseModel):
 
 
 @api.post("/api/share")
-def share(req: ShareRequest):
+def share(req: ShareRequest) -> dict:
     try:
         track = community.track_from_geometry(req.geometry)
         record = community.share_track(
@@ -174,7 +176,7 @@ def share(req: ShareRequest):
             sac=req.sac,
         )
     except PlannerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return community.public_hike(record)
 
 
@@ -186,7 +188,7 @@ def import_gpx(
     dog: str = Form("Unknown"),
     camping: str = Form("Unknown"),
     photos: str = Form("[]"),
-):
+) -> dict:
     import json
 
     raw = gpx.file.read(MAX_GPX_BYTES + 1)
@@ -206,12 +208,12 @@ def import_gpx(
                 raise PlannerError("This track starts outside Europe, which is the only area covered for now.")
             record = community.share_track(track, title[:80], notes[:500], dog, camping, "gpx", refs)
         except PlannerError as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     return community.public_hike(record)
 
 
 @api.get("/photos/{name}")
-def photo_file(name: str):
+def photo_file(name: str) -> FileResponse:
     path = community.photo_path(name)
     if not path:
         raise HTTPException(status_code=404, detail="No such photo.")
@@ -230,7 +232,7 @@ MISSING_STATIC = """<!doctype html><meta charset="utf-8"><title>iHike - setup</t
 
 
 @api.get("/", include_in_schema=False)
-def index():
+def index() -> Response:
     if not (STATIC / "index.html").exists():
         return HTMLResponse(MISSING_STATIC, status_code=503)
     return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})

@@ -6,14 +6,16 @@ import re
 import shutil
 import threading
 import uuid
-from datetime import datetime
-from datetime import timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .config import HF_TOKEN, HIKES_DATASET
 from .errors import PlannerError
 from .geo import build_track, decimate, haversine_km, in_europe
 
+if TYPE_CHECKING:
+    from PIL import Image
 
 DATA_DIR = Path("data")
 HIKES_FILE = DATA_DIR / "hikes.jsonl"
@@ -86,24 +88,23 @@ def load_hikes() -> list[dict]:
 def save_hike(record: dict) -> None:
     ensure_folders()
     lock = scheduler.lock if scheduler else _local_lock
-    with lock:
-        with HIKES_FILE.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    with lock, HIKES_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def nearby_hikes(lat, lon, radius_km=30, limit=5) -> list[dict]:
+def nearby_hikes(lat: float, lon: float, radius_km: float = 30, limit: int = 5) -> list[dict]:
     found = []
     for h in load_hikes():
         try:
             d = haversine_km((lat, lon), h["start"])
-        except Exception:
+        except Exception:  # noqa: S112 - a malformed record is skipped, not fatal
             continue
         if d <= radius_km:
             found.append({**h, "away_km": round(d, 1)})
     return sorted(found, key=lambda h: h["away_km"])[:limit]
 
 
-def _record(track, title, notes, dog, camping, source) -> dict:
+def _record(track: dict, title: str, notes: str, dog: str, camping: str, source: str) -> dict:
     return {
         "id": uuid.uuid4().hex[:12],
         "source": source,
@@ -117,7 +118,7 @@ def _record(track, title, notes, dog, camping, source) -> dict:
         "loop": track["loop"],
         "start": [round(track["latlon"][0][0], 5), round(track["latlon"][0][1], 5)],
         "path": [[round(lat, 5), round(lon, 5)] for lat, lon in decimate(track["latlon"], 300)],
-        "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "created": datetime.now(UTC).isoformat(timespec="seconds"),
     }
 
 
@@ -126,7 +127,7 @@ MAX_PHOTOS_PER_HIKE = 6
 _PHOTO_ID = re.compile(r"^[0-9a-f]{16}$")
 
 
-def save_photo(raw: bytes):
+def save_photo(raw: bytes) -> tuple[str, Image.Image]:
     """Store an uploaded picture as a clean JPEG. Returns (photo_id, PIL image) or raises PlannerError.
 
     Re-encoding drops all metadata (camera, exact GPS position, owner) before anything is published.
@@ -138,12 +139,12 @@ def save_photo(raw: bytes):
     try:
         import io
 
-        img = Image.open(io.BytesIO(raw))
+        img: Image.Image = Image.open(io.BytesIO(raw))
         if img.width * img.height > 60_000_000:
             raise PlannerError("This photo has too many pixels.")
         img = ImageOps.exif_transpose(img).convert("RGB")
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
-        raise PlannerError("This file is not a readable image.")
+        raise PlannerError("This file is not a readable image.") from None
     photo_id = uuid.uuid4().hex[:16]
     big = img.copy()
     big.thumbnail((1600, 1600))
@@ -155,7 +156,7 @@ def save_photo(raw: bytes):
     return photo_id, img
 
 
-def photo_path(name: str):
+def photo_path(name: str) -> Path | None:
     """Path of a stored photo file ('<id>.jpg' or '<id>_s.jpg'), or None."""
     m = re.fullmatch(r"([0-9a-f]{16})(_s)?\.jpg", name or "")
     if not m:
@@ -166,7 +167,7 @@ def photo_path(name: str):
     return None
 
 
-def publish_photos(photos) -> list[dict]:
+def publish_photos(photos: list[dict] | None) -> list[dict]:
     """Move uploaded photos from pending to the published folder. `photos` = [{id, species}]."""
     ensure_folders()
     kept = []
@@ -198,7 +199,7 @@ def publish_photos(photos) -> list[dict]:
     return kept
 
 
-def track_from_geometry(geometry) -> dict:
+def track_from_geometry(geometry: list) -> dict:
     """Validate [[lon, lat, ele?], ...] sent by a browser and rebuild its statistics server-side."""
     if not isinstance(geometry, list) or not 2 <= len(geometry) <= 5000:
         raise PlannerError("The route is missing or too long.")
@@ -208,7 +209,7 @@ def track_from_geometry(geometry) -> dict:
             lon, lat = float(p[0]), float(p[1])
             ele = float(p[2]) if len(p) > 2 and p[2] is not None else None
         except (TypeError, ValueError, IndexError):
-            raise PlannerError("The route contains invalid points.")
+            raise PlannerError("The route contains invalid points.") from None
         if not (math.isfinite(lon) and math.isfinite(lat) and -90 <= lat <= 90 and -180 <= lon <= 180):
             raise PlannerError("The route contains invalid points.")
         if ele is not None and not (math.isfinite(ele) and -500 < ele < 9000):
@@ -222,7 +223,16 @@ def track_from_geometry(geometry) -> dict:
     return track
 
 
-def share_track(track, title, notes, dog, camping, source, photos=None, sac=None) -> dict:
+def share_track(
+    track: dict,
+    title: str,
+    notes: str,
+    dog: str,
+    camping: str,
+    source: str,
+    photos: list[dict] | None = None,
+    sac: int | None = None,
+) -> dict:
     record = _record(
         track,
         title,
@@ -239,7 +249,7 @@ def share_track(track, title, notes, dog, camping, source, photos=None, sac=None
     return record
 
 
-def public_hike(h: dict, with_path=True) -> dict:
+def public_hike(h: dict, with_path: bool = True) -> dict:
     """A stored hike as sent to browsers: only known fields, photos as URLs."""
     out = {
         k: h.get(k)
@@ -261,7 +271,7 @@ def public_hike(h: dict, with_path=True) -> dict:
     }
     if with_path:
         out["path"] = h.get("path") or []
-    photos = []
+    photos: list[dict] = []
     for p in h.get("photos") or []:
         if isinstance(p, dict) and _PHOTO_ID.match(str(p.get("id", ""))):
             photos.append(
