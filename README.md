@@ -43,6 +43,20 @@ The app starts with none of these set and tells you what is switched off.
 
 The first voice request and the first photo after a restart are slow (the models download and load); later ones take a few seconds.
 
+## Development
+
+Python 3.11. Tests run offline: every web service is simulated, no key and no model is needed.
+
+```bash
+make install   # .venv with the app and the dev tools (same versions as the Space), git hooks
+make test      # pytest with coverage
+make lint      # ruff and mypy
+make run       # http://localhost:7860; put your keys in .env (see .env.example)
+```
+
+Dependencies are declared in `pyproject.toml`; `requirements.txt` is generated from it for the Space
+with `make requirements`.
+
 ## Data sources
 
 - Routing and elevation: OpenRouteService (OpenStreetMap data); BRouter for alpine paths the first one refuses

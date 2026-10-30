@@ -47,7 +47,7 @@ Priorities:
 
 ## P2
 
-12. **Dependencies are not pinned.** `requirements.txt` lists names only (`torch`, `gradio` via the SDK, etc.), so two builds of the Space can differ. *Phase 1: `pyproject.toml` with ranges, generated pinned `requirements.txt`.*
+12. ~~**Dependencies are not pinned.**~~ Fixed: ranges in `pyproject.toml`, every package pinned in a generated `requirements.txt` (`scripts/update_requirements.sh`).
 
 13. ~~**`engine.py` is 1,450 lines with eight responsibilities.**~~ Split into the `ihike/` package (13 modules plus `ihike/ai/`), code moved without changes in behaviour.
 
@@ -55,12 +55,12 @@ Priorities:
 
 15. **Logging is `print()`.** 14 calls across the modules, no levels, no request context. *Phase 3: `logging` with levels, no personal data (no coordinates of users' homes, no free text).*
 
-16. **No automated tests in the repository.** Partly fixed: a first pytest suite (95 tests, all external services simulated) is in `tests/`. *Phase 2: coverage targets and the remaining cases.*
+16. **No automated tests in the repository.** Partly fixed: a first pytest suite (95 tests, all external services simulated, 85 % line coverage of `ihike/`) is in `tests/`. *Phase 2: coverage targets and the remaining cases.*
 
 17. **Privacy of shared GPX tracks.** A track recorded from home publishes its start and end point. The interface warns, but does not trim. *Possible feature: hide the first and last few hundred metres, as tracking apps do.*
 
 18. **The interface loads Google Fonts from Google's servers**, which sends each visitor's IP address to Google (a known GDPR concern in the EU). *Phase 7 or earlier: self-host the two fonts.*
 
-19. **Python version is not pinned on the Space.** `README.md` has no `python_version`, so the Space uses the SDK default. *Phase 1: set 3.11 to match `pyproject.toml`.*
+19. ~~**Python version is not pinned on the Space.**~~ Fixed: `python_version: "3.11"` in the README front matter, matching `pyproject.toml`.
 
 20. **Public endpoints accept anonymous publication.** Anyone can add hikes and photos to the community map; there is no moderation or deletion path. *Product decision, not scheduled.*
