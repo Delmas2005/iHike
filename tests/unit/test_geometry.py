@@ -1,4 +1,5 @@
 """Pure functions of the physical model, coordinates and GPX handling."""
+
 from __future__ import annotations
 
 import pytest
@@ -25,9 +26,20 @@ def test_estimated_time_for_a_beginner():
 
 
 COORDINATE_FORMATS = [
-    "45.4892, 6.9858", "45.4892 6.9858", "45,4892 6,9858", "45,4892, 6,9858", "45.4892,6.9858", "45.4892; 6.9858",
-    "45.4892° N, 6.9858° E", "N 45.4892 E 6.9858", "6.9858 E 45.4892 N", "lat 45.4892 lon 6.9858",
-    "(45.4892, 6.9858)", "6.9858, 45.4892", "45°29'21.1\"N 6°59'08.9\"E", "45° 29' 21,1'' N, 6° 59' 8,9'' E",
+    "45.4892, 6.9858",
+    "45.4892 6.9858",
+    "45,4892 6,9858",
+    "45,4892, 6,9858",
+    "45.4892,6.9858",
+    "45.4892; 6.9858",
+    "45.4892° N, 6.9858° E",
+    "N 45.4892 E 6.9858",
+    "6.9858 E 45.4892 N",
+    "lat 45.4892 lon 6.9858",
+    "(45.4892, 6.9858)",
+    "6.9858, 45.4892",
+    "45°29'21.1\"N 6°59'08.9\"E",
+    "45° 29' 21,1'' N, 6° 59' 8,9'' E",
 ]
 
 
@@ -42,8 +54,9 @@ def test_western_and_negative_coordinates():
     assert places.parse_coordinates("40.4168 N 3.7038 W") == pytest.approx((40.4168, -3.7038), abs=1e-3)
 
 
-@pytest.mark.parametrize("text", ["Chamonix", "aiguille de la grande sassiere", "Refuge 2000", "GR 20 Corse",
-                                  "Route 66 km 4", "N7", ""])
+@pytest.mark.parametrize(
+    "text", ["Chamonix", "aiguille de la grande sassiere", "Refuge 2000", "GR 20 Corse", "Route 66 km 4", "N7", ""]
+)
 def test_place_names_are_not_coordinates(text):
     assert places.parse_coordinates(text) is None
 
@@ -54,8 +67,9 @@ def test_out_of_range_coordinates_are_refused():
 
 
 def test_stitch_ways_rebuilds_a_closed_loop():
-    chain, used = geo.stitch_ways([[(0, 0), (0, 0.01)], [(0.01, 0.01), (0, 0.01)],
-                                      [(0.01, 0.01), (0.01, 0)], [(0, 0), (0.01, 0)]])
+    chain, used = geo.stitch_ways(
+        [[(0, 0), (0, 0.01)], [(0.01, 0.01), (0, 0.01)], [(0.01, 0.01), (0.01, 0)], [(0, 0), (0.01, 0)]]
+    )
     assert used > 0.99 and len(chain) == 5 and chain[0] == chain[-1]
 
 
@@ -73,11 +87,14 @@ def test_gpx_round_trip_keeps_distance_and_climb(tmp_path):
     assert again["ascent_m"] == pytest.approx(track["ascent_m"], abs=1)
 
 
-@pytest.mark.parametrize("content", [
-    "not xml",
-    '<?xml version="1.0"?><!DOCTYPE g [<!ENTITY a "aaaa">]><gpx><trk>&a;</trk></gpx>',  # entity expansion
-    "<gpx></gpx>",
-])
+@pytest.mark.parametrize(
+    "content",
+    [
+        "not xml",
+        '<?xml version="1.0"?><!DOCTYPE g [<!ENTITY a "aaaa">]><gpx><trk>&a;</trk></gpx>',  # entity expansion
+        "<gpx></gpx>",
+    ],
+)
 def test_unreadable_or_hostile_gpx_is_refused(tmp_path, content):
     path = tmp_path / "bad.gpx"
     path.write_text(content)
@@ -85,12 +102,23 @@ def test_unreadable_or_hostile_gpx_is_refused(tmp_path, content):
         gpx.parse_gpx(str(path))
 
 
-@pytest.mark.parametrize("text,expected", [
-    ("⛈️ **Thunderstorms forecast** - stay off ridges and summits, or pick another day.",
-     {"severity": "danger", "title": "Thunderstorms forecast", "detail": "Stay off ridges and summits, or pick another day."}),
-    ("🌧️ **Rain likely** (80 %, 14.0 mm) - waterproofs, slippery rock.",
-     {"severity": "warning", "title": "Rain likely (80 %, 14.0 mm)", "detail": "Waterproofs, slippery rock."}),
-])
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        (
+            "⛈️ **Thunderstorms forecast** - stay off ridges and summits, or pick another day.",
+            {
+                "severity": "danger",
+                "title": "Thunderstorms forecast",
+                "detail": "Stay off ridges and summits, or pick another day.",
+            },
+        ),
+        (
+            "🌧️ **Rain likely** (80 %, 14.0 mm) - waterproofs, slippery rock.",
+            {"severity": "warning", "title": "Rain likely (80 %, 14.0 mm)", "detail": "Waterproofs, slippery rock."},
+        ),
+    ],
+)
 def test_alert_text_becomes_structured_data(text, expected):
     assert alerts.alert_data(text) == expected
 

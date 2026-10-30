@@ -34,7 +34,16 @@ def _goal_kind(tags: dict):
     if tags.get("waterway") == "waterfall":
         return "waterfall"
     if tags.get("natural") == "water" and tags.get("water") not in (
-            "river", "stream", "canal", "ditch", "drain", "wastewater", "basin", "moat", "fountain"):
+        "river",
+        "stream",
+        "canal",
+        "ditch",
+        "drain",
+        "wastewater",
+        "basin",
+        "moat",
+        "fountain",
+    ):
         return "lake"
     return None
 
@@ -49,15 +58,15 @@ def find_goals_and_trails(lat, lon, radius_m):
     elements = overpass(
         "[out:json][timeout:30];("
         f'node{a}[natural~"^(peak|saddle|volcano)$"][name];'
-        f'node{a}[mountain_pass=yes][name];'
+        f"node{a}[mountain_pass=yes][name];"
         f'node{a}[tourism~"^(viewpoint|alpine_hut|wilderness_hut)$"][name];'
         f'way{a}[tourism~"^(alpine_hut|wilderness_hut)$"][name];'
-        f'node{a}[waterway=waterfall][name];'
-        f'way{a}[natural=water][name];'
-        f'relation{a}[natural=water][name];'
+        f"node{a}[waterway=waterfall][name];"
+        f"way{a}[natural=water][name];"
+        f"relation{a}[natural=water][name];"
         ");out center tags 250;"
         f'relation{near}[route~"^(hiking|foot)$"]->.r;.r out tags;'
-        '(relation.r[network=lwn];relation.r[roundtrip=yes];);out geom 6;'
+        "(relation.r[network=lwn];relation.r[roundtrip=yes];);out geom 6;"
     )
     if elements is None:
         return None, None
@@ -66,9 +75,16 @@ def find_goals_and_trails(lat, lon, radius_m):
     for el in elements:
         tags = el.get("tags") or {}
         if el.get("type") == "relation" and tags.get("route") in ("hiking", "foot"):
-            trail = trails.setdefault(el["id"], {
-                "id": el["id"], "name": tags.get("name") or tags.get("ref") or "Unnamed trail",
-                "ref": tags.get("ref", ""), "network": NETWORKS.get(tags.get("network", ""), ""), "ways": []})
+            trail = trails.setdefault(
+                el["id"],
+                {
+                    "id": el["id"],
+                    "name": tags.get("name") or tags.get("ref") or "Unnamed trail",
+                    "ref": tags.get("ref", ""),
+                    "network": NETWORKS.get(tags.get("network", ""), ""),
+                    "ways": [],
+                },
+            )
             for member in el.get("members") or []:
                 if member.get("type") == "way" and member.get("role") in (None, "", "main", "forward", "backward"):
                     pts = [(g["lat"], g["lon"]) for g in member.get("geometry") or [] if g]
@@ -84,8 +100,15 @@ def find_goals_and_trails(lat, lon, radius_m):
             continue
         seen.add(key)
         ele = re.match(r"-?\d+(?:\.\d+)?", str(tags.get("ele", "")).replace(",", "."))
-        goals.append({"name": name, "kind": kind, "lat": point["lat"], "lon": point["lon"],
-                      "ele": float(ele.group()) if ele else None})
+        goals.append(
+            {
+                "name": name,
+                "kind": kind,
+                "lat": point["lat"],
+                "lon": point["lon"],
+                "ele": float(ele.group()) if ele else None,
+            }
+        )
     return goals, list(trails.values())
 
 
@@ -122,14 +145,18 @@ def find_trailheads(lat: float, lon: float, radius_m: int = 5000, limit: int = 8
             continue
         seen.add(key)
         capacity = tags.get("capacity", "")
-        found.append({
-            "name": name or ("Trailhead" if trailhead else "Car park"), "named": bool(name),
-            "kind": "trailhead" if trailhead else "parking",
-            "lat": round(point["lat"], 6), "lon": round(point["lon"], 6),
-            "away_km": round(haversine_km((lat, lon), (point["lat"], point["lon"])), 1),
-            "fee": {"yes": True, "no": False}.get(tags.get("fee")),
-            "capacity": int(capacity) if capacity.isdigit() else None,
-        })
+        found.append(
+            {
+                "name": name or ("Trailhead" if trailhead else "Car park"),
+                "named": bool(name),
+                "kind": "trailhead" if trailhead else "parking",
+                "lat": round(point["lat"], 6),
+                "lon": round(point["lon"], 6),
+                "away_km": round(haversine_km((lat, lon), (point["lat"], point["lon"])), 1),
+                "fee": {"yes": True, "no": False}.get(tags.get("fee")),
+                "capacity": int(capacity) if capacity.isdigit() else None,
+            }
+        )
     # Named trailheads first, then named car parks, then the rest; nearest first within each group.
     if order == "distance":
         found.sort(key=lambda p: p["away_km"])

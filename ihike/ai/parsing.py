@@ -1,4 +1,5 @@
 """Understanding a request ("a 3 h loop near Annecy with a lake, tomorrow")."""
+
 from __future__ import annotations
 
 import json
@@ -19,41 +20,96 @@ KIND_WORDS = {
     "loop": ["loop", "loops", "circular", "boucle", "boucles", "circuit", "tour"],
 }
 LEVEL_WORDS = {
-    "Beginner": ["beginner", "beginners", "easy", "family", "kids", "children", "debutant", "debutants",
-                 "facile", "famille", "enfants", "gentle", "leisurely", "tranquille"],
+    "Beginner": [
+        "beginner",
+        "beginners",
+        "easy",
+        "family",
+        "kids",
+        "children",
+        "debutant",
+        "debutants",
+        "facile",
+        "famille",
+        "enfants",
+        "gentle",
+        "leisurely",
+        "tranquille",
+    ],
     "Intermediate": ["intermediate", "moderate", "medium", "intermediaire", "moyen", "moyenne", "sportive"],
-    "Experienced": ["experienced", "expert", "hard", "difficult", "challenging", "confirme", "difficile",
-                    "athletic", "tough", "dur", "costaud"],
+    "Experienced": [
+        "experienced",
+        "expert",
+        "hard",
+        "difficult",
+        "challenging",
+        "confirme",
+        "difficile",
+        "athletic",
+        "tough",
+        "dur",
+        "costaud",
+    ],
 }
 DAY_WORDS = {
     0: ["today", "aujourd'hui", "aujourdhui", "now", "maintenant"],
     1: ["tomorrow", "demain"],
     2: ["day after tomorrow", "apres-demain", "apres demain"],
 }
-WEEKDAYS = [["monday", "lundi"], ["tuesday", "mardi"], ["wednesday", "mercredi"], ["thursday", "jeudi"],
-            ["friday", "vendredi"], ["saturday", "samedi"], ["sunday", "dimanche"]]
+WEEKDAYS = [
+    ["monday", "lundi"],
+    ["tuesday", "mardi"],
+    ["wednesday", "mercredi"],
+    ["thursday", "jeudi"],
+    ["friday", "vendredi"],
+    ["saturday", "samedi"],
+    ["sunday", "dimanche"],
+]
 _PLACE = r"(?:the\s+|le\s+|la\s+|les\s+|l')?([a-z0-9'\-]+(?:[\s\-][a-z0-9'\-]+){0,5})"
 # Strong clues first ("near Annecy"), weak ones only if nothing better ("in Chamonix", "à Tignes").
-_START_STRONG = re.compile(r"\b(?:near|from|around|close to|starting (?:at|from)|pres de|pres d'|depuis|"
-                           r"autour de|autour d'|au depart de|au depart d'|a cote de)\s*" + _PLACE)
+_START_STRONG = re.compile(
+    r"\b(?:near|from|around|close to|starting (?:at|from)|pres de|pres d'|depuis|"
+    r"autour de|autour d'|au depart de|au depart d'|a cote de)\s*" + _PLACE
+)
 _START_WEAK = re.compile(r"(?:\bin|\bat|@@|\bdans|\bvers)\s+" + _PLACE)
 _DEST_RE = re.compile(
     r"\b(?:(?:hike|walk|trek|go|run|head|way|climb)\s+(?:up\s+)?to|up to|climb(?:ing)?|reach|summit of|"
     r"jusqu'au|jusqu'a la|jusqu'a|jusqu'@@|monter au|monter @@ la|monter @@|aller au|aller @@ la|aller @@|"
     r"ascension du|"
-    r"ascension de la|ascension de|direction)\s+" + _PLACE)
-_STOP_AT = re.compile(r"\b(with|avec|for|pour|in|en|during|tomorrow|today|demain|aujourd|this|ce|cette|next|"
-                      r"and|et|then|puis|near|pres|around|autour|from|depuis|starting|au depart|easy|facile|"
-                      r"beginner|debutant|loop|boucle|one way|aller simple|out and back|aller-retour|on|this|ce|"
-                      r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|lundi|mardi|mercredi|jeudi|"
-                      r"vendredi|samedi|dimanche|weekend|week-end|\d)\b")
+    r"ascension de la|ascension de|direction)\s+" + _PLACE
+)
+_STOP_AT = re.compile(
+    r"\b(with|avec|for|pour|in|en|during|tomorrow|today|demain|aujourd|this|ce|cette|next|"
+    r"and|et|then|puis|near|pres|around|autour|from|depuis|starting|au depart|easy|facile|"
+    r"beginner|debutant|loop|boucle|one way|aller simple|out and back|aller-retour|on|this|ce|"
+    r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|lundi|mardi|mercredi|jeudi|"
+    r"vendredi|samedi|dimanche|weekend|week-end|\d)\b"
+)
 # "lac de Crop", "refuge du Goûter", "col de la Croix": a feature word followed by a name.
 _NAMED_PLACE = re.compile(
     r"\b((?:lac|lacs|lake|lago|loch|tarn|refuge|rifugio|cabane|hut|col|pic|pico|pizzo|pointe|aiguille|dent|"
     r"tete|mont|monte|mount|cima|cascade|waterfall|belvedere|croix|glacier|gorges?|chalets?|cirque|plateau)"
-    r"(?:\s+(?:de|du|des|la|le|les|of|the|di|del|della|dei)|\s*d'|\s*l')*\s*[a-z][a-z'\-]*(?:[\s\-][a-z][a-z'\-]*){0,3})")
-_GENERIC = {"mountain", "mountains", "montagne", "montagnes", "the mountains", "nature", "forest", "foret",
-            "hills", "hill", "countryside", "campagne", "alps", "alpes", "go", "walk", "hike"}
+    r"(?:\s+(?:de|du|des|la|le|les|of|the|di|del|della|dei)|\s*d'|\s*l')*\s*[a-z][a-z'\-]*(?:[\s\-][a-z][a-z'\-]*){0,3})"
+)
+_GENERIC = {
+    "mountain",
+    "mountains",
+    "montagne",
+    "montagnes",
+    "the mountains",
+    "nature",
+    "forest",
+    "foret",
+    "hills",
+    "hill",
+    "countryside",
+    "campagne",
+    "alps",
+    "alpes",
+    "go",
+    "walk",
+    "hike",
+}
 
 
 def _plain(text: str) -> str:
@@ -65,18 +121,22 @@ _PARTICLES = {"de", "du", "des", "la", "le", "les", "en", "sur", "sous", "of", "
 
 def _clip_place(raw: str) -> str:
     m = _STOP_AT.search(raw)
-    place = raw[:m.start()] if m else raw
+    place = raw[: m.start()] if m else raw
     return place.strip(" ,.;-'")
 
 
 def _title(place: str) -> str:
     """'lac de la grande sassiere' -> 'Lac de la Grande Sassiere' (geocoding ignores accents anyway)."""
     words = place.split(" ")
-    return " ".join(w if (i and w in _PARTICLES) else
-                    "-".join(p if (j and p in _PARTICLES) else
-                             p[:2] + p[2:].capitalize() if p[:2] in ("d'", "l'") else p.capitalize()
-                             for j, p in enumerate(w.split("-")))
-                    for i, w in enumerate(words))
+    return " ".join(
+        w
+        if (i and w in _PARTICLES)
+        else "-".join(
+            p if (j and p in _PARTICLES) else p[:2] + p[2:].capitalize() if p[:2] in ("d'", "l'") else p.capitalize()
+            for j, p in enumerate(w.split("-"))
+        )
+        for i, w in enumerate(words)
+    )
 
 
 def parse_request(text: str, today: date | None = None) -> dict:
@@ -163,9 +223,9 @@ def parse_request(text: str, today: date | None = None) -> dict:
 _PARSER_PROMPT = (
     "Extract hiking search parameters from the user's request. Answer with JSON only, no prose, with these keys "
     "(omit a key when the request does not say it): start (place name, keep the original spelling and add the "
-    "country if obvious), mode (\"ideas\" when no precise destination is given, \"out_and_back\" or \"one_way\" "
-    "when there is one), destination, hours (number), level (\"Beginner\", \"Intermediate\" or \"Experienced\"), "
-    "activity (\"Hiking\" or \"Trail running\"), kinds (list among lake, summit, hut, waterfall, viewpoint, pass, "
+    'country if obvious), mode ("ideas" when no precise destination is given, "out_and_back" or "one_way" '
+    'when there is one), destination, hours (number), level ("Beginner", "Intermediate" or "Experienced"), '
+    'activity ("Hiking" or "Trail running"), kinds (list among lake, summit, hut, waterfall, viewpoint, pass, '
     "loop), day (0 for today up to 6)."
 )
 
@@ -177,9 +237,13 @@ def _llm_parse(text: str, today: date):
         from huggingface_hub import InferenceClient
 
         out = InferenceClient(token=HF_TOKEN, timeout=30).chat_completion(
-            model=PARSER_MODEL, max_tokens=200, temperature=0,
-            messages=[{"role": "system", "content": _PARSER_PROMPT + f" Today is {today:%A %Y-%m-%d}."},
-                      {"role": "user", "content": text[:500]}],
+            model=PARSER_MODEL,
+            max_tokens=200,
+            temperature=0,
+            messages=[
+                {"role": "system", "content": _PARSER_PROMPT + f" Today is {today:%A %Y-%m-%d}."},
+                {"role": "user", "content": text[:500]},
+            ],
         )
         raw = out.choices[0].message.content or ""
         m = re.search(r"\{.*\}", raw, re.S)

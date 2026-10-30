@@ -1,4 +1,5 @@
 """planner.plan_hikes() end to end, with every external service simulated."""
+
 from __future__ import annotations
 
 import pytest
@@ -38,7 +39,9 @@ def test_start_far_from_any_path_is_retried_with_a_wider_search(web, store):
 def test_router_error_is_reported(web, monkeypatch, store):
     from fakes import Resp
 
-    monkeypatch.setattr(requests, "post", lambda *a, **k: Resp({"error": {"code": 2004, "message": "Route too long"}}, 400))
+    monkeypatch.setattr(
+        requests, "post", lambda *a, **k: Resp({"error": {"code": 2004, "message": "Route too long"}}, 400)
+    )
     with pytest.raises(errors.PlannerError, match="Route too long"):
         planner.plan_hikes("Chamonix", "ideas")
 
@@ -121,29 +124,50 @@ def _geom(a, b):
 
 
 MAP = [
-    node(1, 45.9437, 6.8694, natural="peak", name="Tête du Test", ele="1840"),        # 2.2 km north, +800 m
-    node(2, 45.9287, 6.8794, tourism="alpine_hut", name="Refuge <b>Proche</b>"),         # close, +200 m
-    node(3, 45.9237, 6.9900, natural="peak", name="Aiguille Falaise", ele="1100"),    # router stops short
-    node(4, 46.2000, 6.8694, natural="peak", name="Trop Loin", ele="4000"),           # out of reach
-    node(5, 45.9300, 6.8700, natural="peak"),                                         # unnamed: ignored
-    {"type": "way", "id": 6, "center": {"lat": 45.9317, "lon": 6.8594}, "tags": {"natural": "water", "name": "Lac Bleu"}},
-    {"type": "way", "id": 7, "center": {"lat": 45.9250, "lon": 6.8700},
-     "tags": {"natural": "water", "water": "river", "name": "L'Arve"}},
+    node(1, 45.9437, 6.8694, natural="peak", name="Tête du Test", ele="1840"),  # 2.2 km north, +800 m
+    node(2, 45.9287, 6.8794, tourism="alpine_hut", name="Refuge <b>Proche</b>"),  # close, +200 m
+    node(3, 45.9237, 6.9900, natural="peak", name="Aiguille Falaise", ele="1100"),  # router stops short
+    node(4, 46.2000, 6.8694, natural="peak", name="Trop Loin", ele="4000"),  # out of reach
+    node(5, 45.9300, 6.8700, natural="peak"),  # unnamed: ignored
+    {
+        "type": "way",
+        "id": 6,
+        "center": {"lat": 45.9317, "lon": 6.8594},
+        "tags": {"natural": "water", "name": "Lac Bleu"},
+    },
+    {
+        "type": "way",
+        "id": 7,
+        "center": {"lat": 45.9250, "lon": 6.8700},
+        "tags": {"natural": "water", "water": "river", "name": "L'Arve"},
+    },
     {"type": "relation", "id": 900, "tags": {"route": "hiking", "name": "GR Tour du Test", "network": "nwn"}},
     {"type": "relation", "id": 901, "tags": {"route": "hiking", "name": "Boucle du Carré", "network": "lwn"}},
-    {"type": "relation", "id": 901, "tags": {"route": "hiking", "name": "Boucle du Carré", "network": "lwn"},
-     "members": [{"type": "way", "ref": 11, "role": "", "geometry": _geom(SQUARE[1], SQUARE[2])},
-                 {"type": "way", "ref": 12, "role": "", "geometry": _geom(SQUARE[0], SQUARE[1])},
-                 {"type": "way", "ref": 13, "role": "", "geometry": _geom(SQUARE[3], SQUARE[2])},
-                 {"type": "way", "ref": 14, "role": "alternative", "geometry": _geom(SQUARE[0], (45.90, 6.80))},
-                 {"type": "way", "ref": 15, "role": "", "geometry": _geom(SQUARE[3], SQUARE[0])}]},
+    {
+        "type": "relation",
+        "id": 901,
+        "tags": {"route": "hiking", "name": "Boucle du Carré", "network": "lwn"},
+        "members": [
+            {"type": "way", "ref": 11, "role": "", "geometry": _geom(SQUARE[1], SQUARE[2])},
+            {"type": "way", "ref": 12, "role": "", "geometry": _geom(SQUARE[0], SQUARE[1])},
+            {"type": "way", "ref": 13, "role": "", "geometry": _geom(SQUARE[3], SQUARE[2])},
+            {"type": "way", "ref": 14, "role": "alternative", "geometry": _geom(SQUARE[0], (45.90, 6.80))},
+            {"type": "way", "ref": 15, "role": "", "geometry": _geom(SQUARE[3], SQUARE[0])},
+        ],
+    },
 ]
 
 
 def test_goals_and_trails_are_read_from_overpass(web):
     web.overpass = MAP
     goals, trails = osm.find_goals_and_trails(HOME[0], HOME[1], 5000)
-    assert {g["name"] for g in goals} == {"Tête du Test", "Refuge <b>Proche</b>", "Aiguille Falaise", "Trop Loin", "Lac Bleu"}
+    assert {g["name"] for g in goals} == {
+        "Tête du Test",
+        "Refuge <b>Proche</b>",
+        "Aiguille Falaise",
+        "Trop Loin",
+        "Lac Bleu",
+    }
     assert [g["ele"] for g in goals if g["kind"] == "summit"][0] == 1840.0
     assert [len(t["ways"]) for t in trails] == [0, 4]
 
@@ -163,8 +187,12 @@ def test_ideas_from_real_goals_and_a_waymarked_loop(web, store):
     assert r["recommended"] is not None and len(r["tracks"]) <= 4
     assert web.count("OVERPASS") == 1 and web.count("POST") <= 7
     data = planner.plan_data(r)
-    assert {"id": 900, "name": "GR Tour du Test", "network": "national",
-            "url": "https://hiking.waymarkedtrails.org/#route?id=900"} in data["trails"]
+    assert {
+        "id": 900,
+        "name": "GR Tour du Test",
+        "network": "national",
+        "url": "https://hiking.waymarkedtrails.org/#route?id=900",
+    } in data["trails"]
 
 
 def test_a_big_climb_is_not_offered_for_a_short_beginner_outing(web, store):
@@ -182,21 +210,27 @@ def test_nothing_on_the_map_gives_labelled_computed_loops(web, store):
 
 def test_requested_lake_out_of_reach_is_named(web, store):
     web.grid = True
-    web.overpass = [node(1, 45.9437, 6.8694, natural="peak", name="Tête du Test", ele="1840"),
-                    {"type": "way", "id": 9, "center": {"lat": 46.0300, "lon": 6.8694},
-                     "tags": {"natural": "water", "name": "Lac Lointain"}}]
+    web.overpass = [
+        node(1, 45.9437, 6.8694, natural="peak", name="Tête du Test", ele="1840"),
+        {
+            "type": "way",
+            "id": 9,
+            "center": {"lat": 46.0300, "lon": 6.8694},
+            "tags": {"natural": "water", "name": "Lac Lointain"},
+        },
+    ]
     r = planner.plan_hikes("45.9237, 6.8694", "ideas", level="Beginner", hours=2, kinds={"lake"})
     assert "Lakes nearby are too far for 2 h at beginner level: Lac Lointain (11.8 km away)" in r["hint"]
 
 
 # ------------------------------------------------------------ destination only
 CAR_PARKS = [
-    node(40, 45.9420, 6.8694, amenity="parking", name="Parking du Sommet"),      # 0.19 km: too close, dropped
-    node(41, 45.9380, 6.8694, amenity="parking", name="Parking Haut"),           # 0.6 km
-    node(42, 45.9382, 6.8696, amenity="parking", name="Parking Haut bis"),       # same hike as 41
-    node(43, 45.9300, 6.8694, amenity="parking", name="Parking du Milieu"),      # 1.5 km
-    node(44, 45.9150, 6.8694, highway="trailhead", name="Départ du Bas"),        # 3.2 km
-    node(45, 45.9436, 6.8695, amenity="parking", name="Parking au sommet"),      # on the goal: dropped
+    node(40, 45.9420, 6.8694, amenity="parking", name="Parking du Sommet"),  # 0.19 km: too close, dropped
+    node(41, 45.9380, 6.8694, amenity="parking", name="Parking Haut"),  # 0.6 km
+    node(42, 45.9382, 6.8696, amenity="parking", name="Parking Haut bis"),  # same hike as 41
+    node(43, 45.9300, 6.8694, amenity="parking", name="Parking du Milieu"),  # 1.5 km
+    node(44, 45.9150, 6.8694, highway="trailhead", name="Départ du Bas"),  # 3.2 km
+    node(45, 45.9436, 6.8695, amenity="parking", name="Parking au sommet"),  # on the goal: dropped
 ]
 
 

@@ -1,9 +1,10 @@
 """The iHike web server.
 
-  /                 the iHike interface (static/index.html + static/app.js)
-  /api/...          JSON endpoints used by that interface
-  /photos/<file>    community photos
+/                 the iHike interface (static/index.html + static/app.js)
+/api/...          JSON endpoints used by that interface
+/photos/<file>    community photos
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -24,6 +25,7 @@ from .osm import find_trailheads
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
 MAX_AUDIO_BYTES = 6 * 1024 * 1024
+
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
@@ -65,8 +67,16 @@ def config():
 @api.post("/api/plan")
 def plan(req: PlanRequest):
     try:
-        result = planner.plan_hikes(req.start, req.mode, req.destination, req.activity, req.level,
-                                    req.hours, req.day, kinds=set(req.kinds) or None)
+        result = planner.plan_hikes(
+            req.start,
+            req.mode,
+            req.destination,
+            req.activity,
+            req.level,
+            req.hours,
+            req.day,
+            kinds=set(req.kinds) or None,
+        )
     except Exception as exc:  # noqa: BLE001 - mapped to HTTP errors
         _fail(exc)
     return planner.plan_data(result)
@@ -153,16 +163,30 @@ class ShareRequest(BaseModel):
 def share(req: ShareRequest):
     try:
         track = community.track_from_geometry(req.geometry)
-        record = community.share_track(track, req.title, req.notes, req.dog, req.camping, "planned",
-                                       [p.model_dump() for p in req.photos], sac=req.sac)
+        record = community.share_track(
+            track,
+            req.title,
+            req.notes,
+            req.dog,
+            req.camping,
+            "planned",
+            [p.model_dump() for p in req.photos],
+            sac=req.sac,
+        )
     except PlannerError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return community.public_hike(record)
 
 
 @api.post("/api/import")
-def import_gpx(gpx: UploadFile = File(...), title: str = Form(""), notes: str = Form(""),
-               dog: str = Form("Unknown"), camping: str = Form("Unknown"), photos: str = Form("[]")):
+def import_gpx(
+    gpx: UploadFile = File(...),
+    title: str = Form(""),
+    notes: str = Form(""),
+    dog: str = Form("Unknown"),
+    camping: str = Form("Unknown"),
+    photos: str = Form("[]"),
+):
     import json
 
     raw = gpx.file.read(MAX_GPX_BYTES + 1)

@@ -3,6 +3,7 @@
 `ihike.config` reads the environment at import time, and the community store lives in
 folders relative to the working directory, so both are set here before any test imports iHike.
 """
+
 from __future__ import annotations
 
 import os
@@ -33,6 +34,7 @@ from ihike import community, geo  # noqa: E402
 @pytest.fixture(autouse=True)
 def no_network(monkeypatch):
     """Any request a test did not set up fails loudly instead of reaching the internet."""
+
     def refuse(*args, **kwargs):
         raise AssertionError(f"unexpected network call: {args[:1]}")
 

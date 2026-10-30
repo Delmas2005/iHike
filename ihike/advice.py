@@ -35,7 +35,9 @@ def ai_briefing(context: dict):
 
         client = InferenceClient(token=HF_TOKEN, timeout=60)
         out = client.chat_completion(
-            model=LLM_MODEL, max_tokens=300, temperature=0.4,
+            model=LLM_MODEL,
+            max_tokens=300,
+            temperature=0.4,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
@@ -50,11 +52,15 @@ def ai_briefing(context: dict):
 def fallback_briefing(rec, level, alerts, tracks) -> str:
     if rec is None:
         easiest = tracks[0]
-        return (f"None of these routes is a good match at {level.lower()} level. Even the easiest one is "
-                f"{easiest['distance_km']} km with {easiest['ascent_m']} m of ascent, about {easiest['hours']} h, "
-                f"graded {easiest['grade']} (terrain: {easiest['terrain']}). Choose a closer or lower goal.")
-    text = (f"At {level.lower()} level, variant **{rec['name']}** is the best match: "
-            f"{rec['distance_km']} km, {rec['ascent_m']} m of ascent, about {rec['hours']} h ({rec['grade']}).")
+        return (
+            f"None of these routes is a good match at {level.lower()} level. Even the easiest one is "
+            f"{easiest['distance_km']} km with {easiest['ascent_m']} m of ascent, about {easiest['hours']} h, "
+            f"graded {easiest['grade']} (terrain: {easiest['terrain']}). Choose a closer or lower goal."
+        )
+    text = (
+        f"At {level.lower()} level, variant **{rec['name']}** is the best match: "
+        f"{rec['distance_km']} km, {rec['ascent_m']} m of ascent, about {rec['hours']} h ({rec['grade']})."
+    )
     if alerts:
         text += " Read the alerts above before deciding to go."
     return text

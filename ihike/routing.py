@@ -4,7 +4,17 @@ import re
 
 import requests
 
-from .config import ACTIVITY_SPEED, BROUTER_URL, LEVELS, ORS_API_KEY, ORS_URL, SAC_TAGS, USER_AGENT, VARIANT_COLORS, require_ors
+from .config import (
+    ACTIVITY_SPEED,
+    BROUTER_URL,
+    LEVELS,
+    ORS_API_KEY,
+    ORS_URL,
+    SAC_TAGS,
+    USER_AGENT,
+    VARIANT_COLORS,
+    require_ors,
+)
 from .errors import PlannerError
 from .geo import build_track, estimate_hours, haversine_km
 
@@ -24,16 +34,19 @@ def _ors_error(resp) -> str:
 def ors_route(coordinates, round_trip=None, alternatives=0) -> list[dict]:
     """One call to ORS hiking directions. Returns GeoJSON features (one per route)."""
     require_ors()
-    body = {"coordinates": coordinates, "elevation": True, "instructions": False,
-            "extra_info": ["traildifficulty"]}
+    body = {"coordinates": coordinates, "elevation": True, "instructions": False, "extra_info": ["traildifficulty"]}
     if round_trip:
         body["options"] = {"round_trip": round_trip}
     if alternatives > 1:
         body["alternative_routes"] = {"target_count": alternatives, "weight_factor": 1.6, "share_factor": 0.6}
 
     def send():
-        return requests.post(f"{ORS_URL}/v2/directions/foot-hiking/geojson",
-                             json=body, headers={"Authorization": ORS_API_KEY}, timeout=45)
+        return requests.post(
+            f"{ORS_URL}/v2/directions/foot-hiking/geojson",
+            json=body,
+            headers={"Authorization": ORS_API_KEY},
+            timeout=45,
+        )
 
     resp = send()
     if resp.status_code != 200 and "within a radius" in _ors_error(resp):
@@ -43,8 +56,10 @@ def ors_route(coordinates, round_trip=None, alternatives=0) -> list[dict]:
         resp = send()
     if resp.status_code != 200:
         if "within a radius" in _ors_error(resp):
-            raise PlannerError("No hiking path was found near this point. Pick a start closer to a trail, "
-                               "for example the car park or village where the hike begins.")
+            raise PlannerError(
+                "No hiking path was found near this point. Pick a start closer to a trail, "
+                "for example the car park or village where the hike begins."
+            )
         raise PlannerError(f"Routing failed: {_ors_error(resp)}")
     return resp.json().get("features") or []
 
@@ -62,10 +77,17 @@ def brouter_route(start, end):
     Returns (coords, sac, None) on success, or (None, 0, reason) so the reason can be shown.
     """
     try:
-        resp = requests.get(BROUTER_URL, timeout=(5, 20), params={
-            "lonlats": f"{start[1]:.6f},{start[0]:.6f}|{end[1]:.6f},{end[0]:.6f}",
-            "profile": "hiking-mountain", "alternativeidx": 0, "format": "geojson",
-        }, headers=USER_AGENT)
+        resp = requests.get(
+            BROUTER_URL,
+            timeout=(5, 20),
+            params={
+                "lonlats": f"{start[1]:.6f},{start[0]:.6f}|{end[1]:.6f},{end[0]:.6f}",
+                "profile": "hiking-mountain",
+                "alternativeidx": 0,
+                "format": "geojson",
+            },
+            headers=USER_AGENT,
+        )
         if resp.status_code != 200:
             detail = " ".join((resp.text or "").split())[:120] if hasattr(resp, "text") else ""
             return None, 0, f"HTTP {resp.status_code} {detail}".strip()
@@ -92,8 +114,14 @@ def brouter_route(start, end):
 
 def _from_ors(feature) -> tuple:
     props = feature.get("properties", {})
-    return (feature["geometry"]["coordinates"], props.get("summary", {}).get("distance"),
-            props.get("ascent"), props.get("descent"), _ors_sac(props), "ors")
+    return (
+        feature["geometry"]["coordinates"],
+        props.get("summary", {}).get("distance"),
+        props.get("ascent"),
+        props.get("descent"),
+        _ors_sac(props),
+        "ors",
+    )
 
 
 def _make_track(route, level, activity, end=None, out_and_back=False) -> dict:
@@ -129,10 +157,13 @@ def plan_variants(start, end, hours, level, activity, out_and_back=False) -> lis
         for seed, factor in enumerate((0.6, 1.0, 1.35), start=1):
             length_m = int(min(max(base_km * factor, 2.0), 80.0) * 1000)
             try:
-                routes += [from_ors(f) for f in ors_route(
-                    [[start[1], start[0]]],
-                    round_trip={"length": length_m, "points": 3, "seed": seed},
-                )[:1]]
+                routes += [
+                    from_ors(f)
+                    for f in ors_route(
+                        [[start[1], start[0]]],
+                        round_trip={"length": length_m, "points": 3, "seed": seed},
+                    )[:1]
+                ]
             except PlannerError as exc:
                 last_error = exc
         if not routes:

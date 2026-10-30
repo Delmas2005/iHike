@@ -19,9 +19,11 @@ def write_gpx(track, folder) -> str:
         for (lat, lon), ele in zip(track["latlon"], eles)
     )
     name = html.escape(f"iHike - {track['name']}")
-    xml = ('<?xml version="1.0" encoding="UTF-8"?>'
-           '<gpx version="1.1" creator="iHike" xmlns="http://www.topografix.com/GPX/1/1">'
-           f"<trk><name>{name}</name><trkseg>{points}</trkseg></trk></gpx>")
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<gpx version="1.1" creator="iHike" xmlns="http://www.topografix.com/GPX/1/1">'
+        f"<trk><name>{name}</name><trkseg>{points}</trkseg></trk></gpx>"
+    )
     path = Path(folder) / f"variant_{track['name'][0]}.gpx"
     path.write_text(xml, encoding="utf-8")
     return str(path)

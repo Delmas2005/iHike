@@ -1,4 +1,5 @@
 """Importing iHike has no side effects; the community store is set up when the server starts."""
+
 from __future__ import annotations
 
 import os

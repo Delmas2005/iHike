@@ -6,6 +6,7 @@
 
 Models load on first use and stay in memory.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -23,5 +24,4 @@ def _installed(module: str) -> bool:
 
 def available() -> dict:
     """Which in-Space features have their Python packages installed."""
-    return {"voice": _installed("faster_whisper"),
-            "species": _installed("open_clip") and _installed("torch")}
+    return {"voice": _installed("faster_whisper"), "species": _installed("open_clip") and _installed("torch")}

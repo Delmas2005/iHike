@@ -1,4 +1,5 @@
 """The HTTP API, through FastAPI's TestClient, with the planner on simulated services."""
+
 from __future__ import annotations
 
 import io
@@ -8,7 +9,6 @@ from fakes import node
 from PIL import Image
 
 from ihike import ai, geo, gpx
-
 
 
 def test_interface_and_static_files_are_served(client):
@@ -30,11 +30,18 @@ def test_config_reports_features(client):
 
 def test_plan_ideas_json_shape(client, web):
     web.grid = True
-    web.overpass = [node(1, 45.9437, 6.8694, natural="peak", name="Tête du Test", ele="1840"),
-                    {"type": "way", "id": 6, "center": {"lat": 45.9317, "lon": 6.8594},
-                     "tags": {"natural": "water", "name": "Lac Bleu"}}]
-    r = client.post("/api/plan", json={"start": "45.9237, 6.8694", "mode": "ideas", "level": "Intermediate",
-                                       "hours": 4, "day": 1})
+    web.overpass = [
+        node(1, 45.9437, 6.8694, natural="peak", name="Tête du Test", ele="1840"),
+        {
+            "type": "way",
+            "id": 6,
+            "center": {"lat": 45.9317, "lon": 6.8594},
+            "tags": {"natural": "water", "name": "Lac Bleu"},
+        },
+    ]
+    r = client.post(
+        "/api/plan", json={"start": "45.9237, 6.8694", "mode": "ideas", "level": "Intermediate", "hours": 4, "day": 1}
+    )
     assert r.status_code == 200, r.text
     d = r.json()
     assert d["ideas"] and len(d["hikes"]) == 2 and d["start"]["label"].startswith("45.92370")
@@ -48,30 +55,49 @@ def test_plan_ideas_json_shape(client, web):
 
 def test_plan_ideas_filtered_by_kind(client, web):
     web.grid = True
-    web.overpass = [node(1, 45.9437, 6.8694, natural="peak", name="Tête du Test", ele="1840"),
-                    {"type": "way", "id": 6, "center": {"lat": 45.9317, "lon": 6.8594},
-                     "tags": {"natural": "water", "name": "Lac Bleu"}}]
-    r = client.post("/api/plan", json={"start": "45.9237, 6.8694", "mode": "ideas", "level": "Intermediate",
-                                       "hours": 4, "kinds": ["lake"]})
+    web.overpass = [
+        node(1, 45.9437, 6.8694, natural="peak", name="Tête du Test", ele="1840"),
+        {
+            "type": "way",
+            "id": 6,
+            "center": {"lat": 45.9317, "lon": 6.8594},
+            "tags": {"natural": "water", "name": "Lac Bleu"},
+        },
+    ]
+    r = client.post(
+        "/api/plan",
+        json={"start": "45.9237, 6.8694", "mode": "ideas", "level": "Intermediate", "hours": 4, "kinds": ["lake"]},
+    )
     assert [(h["title"], h["kind"]) for h in r.json()["hikes"]] == [("Lac Bleu", "Out and back to a lake")]
 
 
 def test_plan_alpine_destination_json(client, web):
     web.short_ors, web.brouter = True, True
-    r = client.post("/api/plan", json={"start": "45.4885, 6.968", "mode": "out_and_back",
-                                       "destination": "45.50472, 6.99972", "level": "Beginner", "hours": 6})
+    r = client.post(
+        "/api/plan",
+        json={
+            "start": "45.4885, 6.968",
+            "mode": "out_and_back",
+            "destination": "45.50472, 6.99972",
+            "level": "Beginner",
+            "hours": 6,
+        },
+    )
     d = r.json()
     assert r.status_code == 200 and d["no_match"] and d["hikes"][0]["sac"] == 5
     assert d["hikes"][0]["title"] == "45.50472" and d["hikes"][0]["kind"] == "There and back"
     assert any(a["severity"] == "danger" and a["title"].startswith("Alpine terrain") for a in d["alerts"])
 
 
-@pytest.mark.parametrize("body,status,message", [
-    ({"start": "40.7, -74.0", "mode": "ideas"}, 400, "outside Europe"),
-    ({"start": "Chamonix", "mode": "teleport"}, 400, "Unknown trip type"),
-    ({"start": "", "mode": "ideas"}, 400, "Please enter"),
-    ({"start": "x" * 500}, 422, None),
-])
+@pytest.mark.parametrize(
+    "body,status,message",
+    [
+        ({"start": "40.7, -74.0", "mode": "ideas"}, 400, "outside Europe"),
+        ({"start": "Chamonix", "mode": "teleport"}, 400, "Unknown trip type"),
+        ({"start": "", "mode": "ideas"}, 400, "Please enter"),
+        ({"start": "x" * 500}, 422, None),
+    ],
+)
 def test_plan_errors(client, web, body, status, message):
     r = client.post("/api/plan", json=body)
     assert r.status_code == status
@@ -79,12 +105,15 @@ def test_plan_errors(client, web, body, status, message):
         assert message in r.json()["detail"]
 
 
-@pytest.mark.parametrize("text,expected", [
-    ("Une boucle de 3h près d'Annecy avec un lac, demain", {"start": "Annecy", "hours": 3.0}),
-    ("lac de crop", {"destination": "Lac de Crop", "mode": "out_and_back"}),
-    ("une boucle avec un lac", {"mode": "ideas", "kinds": ["lake", "loop"]}),
-    ("Lac de Crop depuis Prabert", {"start": "Prabert", "destination": "Lac de Crop"}),
-])
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Une boucle de 3h près d'Annecy avec un lac, demain", {"start": "Annecy", "hours": 3.0}),
+        ("lac de crop", {"destination": "Lac de Crop", "mode": "out_and_back"}),
+        ("une boucle avec un lac", {"mode": "ideas", "kinds": ["lake", "loop"]}),
+        ("Lac de Crop depuis Prabert", {"start": "Prabert", "destination": "Lac de Crop"}),
+    ],
+)
 def test_ask(client, text, expected):
     r = client.post("/api/ask", json={"text": text}).json()
     assert r["source"] == "rules"
@@ -99,8 +128,12 @@ def test_trailheads(client, web):
     web.overpass = [
         node(30, 45.9300, 6.8700, amenity="parking", name="Parking du Lac", fee="no", capacity="40"),
         node(31, 45.9250, 6.8690, amenity="parking", access="private", name="Hotel guests"),
-        {"type": "way", "id": 32, "center": {"lat": 45.9240, "lon": 6.8695},
-         "tags": {"amenity": "parking", "parking": "underground"}},
+        {
+            "type": "way",
+            "id": 32,
+            "center": {"lat": 45.9240, "lon": 6.8695},
+            "tags": {"amenity": "parking", "parking": "underground"},
+        },
         node(33, 45.9400, 6.8800, highway="trailhead", name="Départ Sentier des Crêtes"),
         node(34, 45.9238, 6.8696, amenity="parking"),
         node(35, 45.92381, 6.86961, amenity="parking"),  # duplicate of 34
@@ -129,8 +162,10 @@ def _jpeg_with_gps() -> bytes:
     return buf.getvalue()
 
 
-EDELWEISS = {"verdict": "match", "species": [{"name": "Edelweiss", "scientific": "Leontopodium nivale",
-                                              "group": "flower", "score": 0.81}]}
+EDELWEISS = {
+    "verdict": "match",
+    "species": [{"name": "Edelweiss", "scientific": "Leontopodium nivale", "group": "flower", "score": 0.81}],
+}
 
 
 def test_photo_metadata_is_removed_and_species_returned(client, store, monkeypatch):
@@ -176,9 +211,18 @@ def test_share_a_route_with_a_photo(client, store, monkeypatch):
     monkeypatch.setattr(ai, "available", lambda: {"voice": False, "species": True})
     monkeypatch.setattr(ai, "identify", lambda im: EDELWEISS)
     photo = client.post("/api/photos", files={"image": ("p.jpg", _jpeg_with_gps(), "image/jpeg")}).json()
-    r = client.post("/api/share", json={
-        "geometry": GEOMETRY, "title": "Test <script>", "notes": "n", "dog": "Yes", "camping": "Maybe", "sac": 3,
-        "photos": [{"id": photo["id"], "species": photo["species"]}, {"id": "../../etc", "species": []}]})
+    r = client.post(
+        "/api/share",
+        json={
+            "geometry": GEOMETRY,
+            "title": "Test <script>",
+            "notes": "n",
+            "dog": "Yes",
+            "camping": "Maybe",
+            "sac": 3,
+            "photos": [{"id": photo["id"], "species": photo["species"]}, {"id": "../../etc", "species": []}],
+        },
+    )
     assert r.status_code == 200
     rec = r.json()
     assert rec["title"] == "Test <script>" and rec["dog"] == "Yes" and rec["camping"] == "Unknown"
@@ -189,11 +233,14 @@ def test_share_a_route_with_a_photo(client, store, monkeypatch):
     assert client.get(rec["photos"][0]["url"]).status_code == 200
 
 
-@pytest.mark.parametrize("geometry,status", [
-    ([[1, 2]], 400),                                   # one point
-    ([[-74, 40.7], [-74.01, 40.71]], 400),             # outside Europe
-    ([["a", "b"], [1, 2]], 422),                       # not numbers
-])
+@pytest.mark.parametrize(
+    "geometry,status",
+    [
+        ([[1, 2]], 400),  # one point
+        ([[-74, 40.7], [-74.01, 40.71]], 400),  # outside Europe
+        ([["a", "b"], [1, 2]], 422),  # not numbers
+    ],
+)
 def test_share_rejects_bad_routes(client, geometry, status):
     assert client.post("/api/share", json={"geometry": geometry}).status_code == status
 
@@ -202,8 +249,11 @@ def test_import_gpx_and_list(client, store, tmp_path):
     track = geo.build_track(GEOMETRY)
     track["name"] = "A · Test"
     content = open(gpx.write_gpx(track, tmp_path), "rb").read()
-    r = client.post("/api/import", files={"gpx": ("t.gpx", content, "application/gpx+xml")},
-                    data={"title": "Imported", "notes": "", "dog": "No", "camping": "No", "photos": "not json"})
+    r = client.post(
+        "/api/import",
+        files={"gpx": ("t.gpx", content, "application/gpx+xml")},
+        data={"title": "Imported", "notes": "", "dog": "No", "camping": "No", "photos": "not json"},
+    )
     assert r.status_code == 200 and r.json()["title"] == "Imported"
     bad = client.post("/api/import", files={"gpx": ("t.gpx", b"<gpx></gpx>", "application/gpx+xml")})
     assert bad.status_code == 400

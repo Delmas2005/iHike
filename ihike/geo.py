@@ -77,10 +77,17 @@ def build_track(coords, distance_m=None, ascent=None, descent=None, sac=0) -> di
     floor = {3: "Moderate", 4: "Hard", 5: "Alpine", 6: "Alpine"}.get(sac, "Easy")
     grade = max(grade_for(effort), floor, key=GRADES.index)
     return {
-        "latlon": latlon, "eles": eles, "km": km,
-        "distance_km": round(dist_km, 1), "ascent_m": round(ascent), "descent_m": round(descent),
+        "latlon": latlon,
+        "eles": eles,
+        "km": km,
+        "distance_km": round(dist_km, 1),
+        "ascent_m": round(ascent),
+        "descent_m": round(descent),
         "max_ele": round(max(eles)) if eles else None,
-        "effort": round(effort, 1), "grade": grade, "sac": sac, "terrain": SAC_LABELS.get(sac, SAC_LABELS[0]),
+        "effort": round(effort, 1),
+        "grade": grade,
+        "sac": sac,
+        "terrain": SAC_LABELS.get(sac, SAC_LABELS[0]),
         "loop": haversine_km(latlon[0], latlon[-1]) < 0.3,
     }
 

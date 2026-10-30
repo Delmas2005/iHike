@@ -17,8 +17,8 @@ from .geo import build_track, decimate, haversine_km, in_europe
 
 DATA_DIR = Path("data")
 HIKES_FILE = DATA_DIR / "hikes.jsonl"
-PHOTOS_DIR = DATA_DIR / "photos"          # published with a shared hike (synced to the dataset)
-PENDING_DIR = Path("pending_photos")      # uploaded but not yet shared (never synced)
+PHOTOS_DIR = DATA_DIR / "photos"  # published with a shared hike (synced to the dataset)
+PENDING_DIR = Path("pending_photos")  # uploaded but not yet shared (never synced)
 _local_lock = threading.Lock()
 scheduler = None
 persistence_error = ""
@@ -45,8 +45,13 @@ def init_storage() -> None:
 
         try:  # restore what previous runs of the Space saved (hikes and their photos)
             with tempfile.TemporaryDirectory() as tmp:
-                snapshot_download(HIKES_DATASET, repo_type="dataset", token=HF_TOKEN, local_dir=tmp,
-                                  allow_patterns=["hikes.jsonl", "photos/*"])
+                snapshot_download(
+                    HIKES_DATASET,
+                    repo_type="dataset",
+                    token=HF_TOKEN,
+                    local_dir=tmp,
+                    allow_patterns=["hikes.jsonl", "photos/*"],
+                )
                 if (Path(tmp) / "hikes.jsonl").exists():
                     shutil.copy(Path(tmp) / "hikes.jsonl", HIKES_FILE)
                 for photo in (Path(tmp) / "photos").glob("*.jpg"):
@@ -54,8 +59,12 @@ def init_storage() -> None:
         except Exception as exc:
             print("Nothing restored:", exc)  # first run: the dataset does not exist yet
         scheduler = CommitScheduler(
-            repo_id=HIKES_DATASET, repo_type="dataset", folder_path=DATA_DIR,
-            every=5, token=HF_TOKEN, private=True,
+            repo_id=HIKES_DATASET,
+            repo_type="dataset",
+            folder_path=DATA_DIR,
+            every=5,
+            token=HF_TOKEN,
+            private=True,
         )
     except Exception as exc:  # the app must still start without persistence
         persistence_error = f"{type(exc).__name__}: {exc}".splitlines()[0][:200]
@@ -96,11 +105,15 @@ def nearby_hikes(lat, lon, radius_km=30, limit=5) -> list[dict]:
 
 def _record(track, title, notes, dog, camping, source) -> dict:
     return {
-        "id": uuid.uuid4().hex[:12], "source": source,
+        "id": uuid.uuid4().hex[:12],
+        "source": source,
         "title": (title or "").strip()[:80] or "Untitled hike",
         "notes": (notes or "").strip()[:500],
-        "dog": dog, "camping": camping,
-        "distance_km": track["distance_km"], "ascent_m": track["ascent_m"], "grade": track["grade"],
+        "dog": dog,
+        "camping": camping,
+        "distance_km": track["distance_km"],
+        "ascent_m": track["ascent_m"],
+        "grade": track["grade"],
         "loop": track["loop"],
         "start": [round(track["latlon"][0][0], 5), round(track["latlon"][0][1], 5)],
         "path": [[round(lat, 5), round(lon, 5)] for lat, lon in decimate(track["latlon"], 300)],
@@ -172,9 +185,15 @@ def publish_photos(photos) -> list[dict]:
                 elif dst.exists():
                     moved = True
         if moved:
-            species = [{"name": str(x.get("name", ""))[:60], "scientific": str(x.get("scientific", ""))[:60],
-                        "score": round(float(x.get("score", 0)), 2)}
-                       for x in (p.get("species") or [])[:3] if isinstance(x, dict)]
+            species = [
+                {
+                    "name": str(x.get("name", ""))[:60],
+                    "scientific": str(x.get("scientific", ""))[:60],
+                    "score": round(float(x.get("score", 0)), 2),
+                }
+                for x in (p.get("species") or [])[:3]
+                if isinstance(x, dict)
+            ]
             kept.append({"id": pid, "species": species})
     return kept
 
@@ -204,8 +223,14 @@ def track_from_geometry(geometry) -> dict:
 
 
 def share_track(track, title, notes, dog, camping, source, photos=None, sac=None) -> dict:
-    record = _record(track, title, notes, dog if dog in ("Yes", "No") else "Unknown",
-                     camping if camping in ("Yes", "No") else "Unknown", source)
+    record = _record(
+        track,
+        title,
+        notes,
+        dog if dog in ("Yes", "No") else "Unknown",
+        camping if camping in ("Yes", "No") else "Unknown",
+        source,
+    )
     record["max_ele"] = track["max_ele"]
     if sac:
         record["sac"] = int(sac) if str(sac).isdigit() and 0 < int(sac) <= 6 else 0
@@ -216,15 +241,36 @@ def share_track(track, title, notes, dog, camping, source, photos=None, sac=None
 
 def public_hike(h: dict, with_path=True) -> dict:
     """A stored hike as sent to browsers: only known fields, photos as URLs."""
-    out = {k: h.get(k) for k in ("id", "title", "notes", "dog", "camping", "distance_km", "ascent_m",
-                                 "grade", "loop", "start", "created", "source", "max_ele")}
+    out = {
+        k: h.get(k)
+        for k in (
+            "id",
+            "title",
+            "notes",
+            "dog",
+            "camping",
+            "distance_km",
+            "ascent_m",
+            "grade",
+            "loop",
+            "start",
+            "created",
+            "source",
+            "max_ele",
+        )
+    }
     if with_path:
         out["path"] = h.get("path") or []
     photos = []
     for p in h.get("photos") or []:
         if isinstance(p, dict) and _PHOTO_ID.match(str(p.get("id", ""))):
-            photos.append({"url": f"/photos/{p['id']}.jpg", "thumb": f"/photos/{p['id']}_s.jpg",
-                           "species": p.get("species") or []})
+            photos.append(
+                {
+                    "url": f"/photos/{p['id']}.jpg",
+                    "thumb": f"/photos/{p['id']}_s.jpg",
+                    "species": p.get("species") or [],
+                }
+            )
     out["photos"] = photos
     seen = []
     for p in photos:

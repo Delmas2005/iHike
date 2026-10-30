@@ -54,18 +54,30 @@ def marked_loops(trails, start, hours, level, activity, limit=2) -> list[dict]:
         approach = haversine_km(start, chain[nearest])
         if approach > 1.5:
             continue
-        chain = chain[nearest:] + chain[1:nearest + 1]  # same loop, starting at the point closest to the user
+        chain = chain[nearest:] + chain[1 : nearest + 1]  # same loop, starting at the point closest to the user
         step = max(1, len(chain) // 10)
         waypoints = chain[::step][:10] + [chain[0]]
         if approach > 0.15:
             waypoints = [start] + waypoints + [start]
-        loops.append({"name": trail["name"], "waypoints": waypoints, "length_km": length + 2 * approach,
-                      "score": abs(length / LEVELS[level]["flat_kmh"] - hours)})
+        loops.append(
+            {
+                "name": trail["name"],
+                "waypoints": waypoints,
+                "length_km": length + 2 * approach,
+                "score": abs(length / LEVELS[level]["flat_kmh"] - hours),
+            }
+        )
     return sorted(loops, key=lambda l: l["score"])[:limit]
 
 
-KIND_PLURAL = {"summit": "Summits", "lake": "Lakes", "hut": "Huts", "viewpoint": "Viewpoints",
-               "waterfall": "Waterfalls", "pass": "Passes"}
+KIND_PLURAL = {
+    "summit": "Summits",
+    "lake": "Lakes",
+    "hut": "Huts",
+    "viewpoint": "Viewpoints",
+    "waterfall": "Waterfalls",
+    "pass": "Passes",
+}
 
 
 def out_of_reach_hint(goals, chosen, start, kinds, hours, level) -> str:
@@ -73,12 +85,16 @@ def out_of_reach_hint(goals, chosen, start, kinds, hours, level) -> str:
     wanted = [k for k in (kinds or []) if k in KIND_PLURAL]
     if not wanted or any(g["kind"] in wanted for g in chosen):
         return ""
-    near = sorted((g for g in goals if g["kind"] in wanted), key=lambda g: haversine_km(start, (g["lat"], g["lon"])))[:3]
+    near = sorted((g for g in goals if g["kind"] in wanted), key=lambda g: haversine_km(start, (g["lat"], g["lon"])))[
+        :3
+    ]
     if not near:
         return f"No {KIND_PLURAL[wanted[0]].lower()} were found on the map within reach of this start."
     names = ", ".join(f"{g['name']} ({haversine_km(start, (g['lat'], g['lon'])):.1f} km away)" for g in near)
-    return (f"{KIND_PLURAL[wanted[0]]} nearby are too far for {hours:g} h at {level.lower()} level: {names}. "
-            "Ask for one by name to plan a there-and-back to it anyway.")
+    return (
+        f"{KIND_PLURAL[wanted[0]]} nearby are too far for {hours:g} h at {level.lower()} level: {names}. "
+        "Ask for one by name to plan a there-and-back to it anyway."
+    )
 
 
 def suggest_hikes(start, hours, level, activity, kinds=None, hints=None):
@@ -112,11 +128,15 @@ def suggest_hikes(start, hours, level, activity, kinds=None, hints=None):
         # A lake is marked at its centre, so the shore path is allowed to end further from the point.
         if track["end_gap_km"] > (0.8 if g["kind"] == "lake" else 0.3):
             continue  # no accepted path reaches it: not something to suggest
-        track.update(title=f"{g['name']} ({g['kind']})", kind=f"Out and back to a {g['kind']}", far_label=g["name"],
-                     place=g["name"])
+        track.update(
+            title=f"{g['name']} ({g['kind']})",
+            kind=f"Out and back to a {g['kind']}",
+            far_label=g["name"],
+            place=g["name"],
+        )
         tracks.append(track)
 
-    for loop in ([] if kinds and "loop" not in kinds else marked_loops(trails, start, hours, level, activity)):
+    for loop in [] if kinds and "loop" not in kinds else marked_loops(trails, start, hours, level, activity):
         try:
             features = ors_route([[p[1], p[0]] for p in loop["waypoints"]])
         except PlannerError:
@@ -130,7 +150,7 @@ def suggest_hikes(start, hours, level, activity, kinds=None, hints=None):
         tracks.append(track)
 
     tracks.sort(key=lambda t: (not suits(t, level), abs(t["hours"] - hours)))
-    tracks = tracks[:len(VARIANT_COLORS)]
+    tracks = tracks[: len(VARIANT_COLORS)]
     for i, t in enumerate(tracks):
         t["name"] = f"{'ABCD'[i]} · {t['title']}"
         t["color"] = VARIANT_COLORS[i]
@@ -164,10 +184,17 @@ def plan_from_car_parks(end, end_label, hours, level, activity, out_and_back=Tru
         if not features:
             continue
         track = _make_track(_from_ors(features[0]), level, activity, end, out_and_back)
-        name = p["name"] if p["named"] else (f"a {'trailhead' if p['kind'] == 'trailhead' else 'car park'}"
-                                              + (f" at {p['ele']} m" if p.get("ele") else ""))
-        track.update(place=f"From {name}", start_point={"lat": p["lat"], "lon": p["lon"], "label": name},
-                     far_label=where)
+        name = (
+            p["name"]
+            if p["named"]
+            else (
+                f"a {'trailhead' if p['kind'] == 'trailhead' else 'car park'}"
+                + (f" at {p['ele']} m" if p.get("ele") else "")
+            )
+        )
+        track.update(
+            place=f"From {name}", start_point={"lat": p["lat"], "lon": p["lon"], "label": name}, far_label=where
+        )
         tracks.append(track)
     if not tracks:
         raise PlannerError(f"No route to {where} could be found from the car parks around it. Enter a start.")

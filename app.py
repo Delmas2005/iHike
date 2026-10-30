@@ -2,6 +2,7 @@
 
 The code lives in the `ihike` package; see docs/ARCHITECTURE.md.
 """
+
 from __future__ import annotations
 
 import os

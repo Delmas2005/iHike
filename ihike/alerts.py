@@ -11,18 +11,26 @@ def terrain_alerts(tracks, end=None) -> list[str]:
     alerts = []
     hardest = max(t["sac"] for t in tracks)
     if hardest >= 5:
-        alerts.append(f"🧗 **Alpine terrain ({SAC_LABELS[hardest]})** - scrambling and exposed passages, possibly "
-                      "snow or glacier. This is mountaineering ground, not hiking: experience and equipment required.")
+        alerts.append(
+            f"🧗 **Alpine terrain ({SAC_LABELS[hardest]})** - scrambling and exposed passages, possibly "
+            "snow or glacier. This is mountaineering ground, not hiking: experience and equipment required."
+        )
     elif hardest == 4:
-        alerts.append("🧗 **T4 alpine hiking on the way** - hands needed in places, exposed passages, "
-                      "path sometimes hard to follow.")
+        alerts.append(
+            "🧗 **T4 alpine hiking on the way** - hands needed in places, exposed passages, "
+            "path sometimes hard to follow."
+        )
     top = max((t["max_ele"] for t in tracks if t["max_ele"]), default=0)
     if top >= 2500:
-        alerts.append(f"🏔️ **High mountain** (up to {top} m) - snow or ice can remain or arrive in any season; "
-                      "check recent conditions and expect to move slower than the estimate.")
+        alerts.append(
+            f"🏔️ **High mountain** (up to {top} m) - snow or ice can remain or arrive in any season; "
+            "check recent conditions and expect to move slower than the estimate."
+        )
     if any(t.get("router") == "brouter" for t in tracks):
-        alerts.append("ℹ️ The standard hiking router does not go all the way to this destination (usually because the "
-                      "last section is graded too difficult). This route was computed with an alpine profile instead.")
+        alerts.append(
+            "ℹ️ The standard hiking router does not go all the way to this destination (usually because the "
+            "last section is graded too difficult). This route was computed with an alpine profile instead."
+        )
     short = min((t["end_gap_km"] for t in tracks if "end_gap_km" in t), default=0)
     if end is not None and short > 0.3:
         t = min((t for t in tracks if "end_gap_km" in t), key=lambda t: t["end_gap_km"])
@@ -35,11 +43,13 @@ def terrain_alerts(tracks, end=None) -> list[str]:
                 missing = f" and about {round(climb_left, -1):.0f} m below it"
         legs = 2 if t.get("far_label") == "Turnaround point" else 1
         full_km = t["distance_km"] + short * 1.3 * legs
-        alerts.append(f"🛑 **The route stops before your destination**: it ends {short:.1f} km away{missing}. "
-                      "The rest is not mapped as a path, or is beyond hiking grade, so it is not drawn and not "
-                      f"counted. Including it, the outing would be roughly {full_km:.0f} km and "
-                      f"+{round(t['ascent_m'] + climb_left, -1):.0f} m."
-                      + (f" (Alpine router: {t['alpine_note']}.)" if t.get("alpine_note") else ""))
+        alerts.append(
+            f"🛑 **The route stops before your destination**: it ends {short:.1f} km away{missing}. "
+            "The rest is not mapped as a path, or is beyond hiking grade, so it is not drawn and not "
+            f"counted. Including it, the outing would be roughly {full_km:.0f} km and "
+            f"+{round(t['ascent_m'] + climb_left, -1):.0f} m."
+            + (f" (Alpine router: {t['alpine_note']}.)" if t.get("alpine_note") else "")
+        )
     return alerts
 
 
@@ -62,8 +72,10 @@ def weather_alerts(w, longest_hours: float) -> list[str]:
     if w["tmin"] is not None and w["tmin"] <= 0:
         alerts.append(f"🥶 **Frost** (down to {round(w['tmin'])} °C) - possible ice in the morning.")
     if w["daylight_h"] and longest_hours > 0.7 * w["daylight_h"]:
-        alerts.append(f"🌙 **Short daylight** ({w['daylight_h']} h, sunset {w['sunset']}) - "
-                      "the longest variant leaves little margin; take a headlamp.")
+        alerts.append(
+            f"🌙 **Short daylight** ({w['daylight_h']} h, sunset {w['sunset']}) - "
+            "the longest variant leaves little margin; take a headlamp."
+        )
     return alerts
 
 
@@ -82,8 +94,13 @@ def alert_data(text: str) -> dict:
         title = f"{title} {figures})"
         detail = re.sub(r"^[\s:\-–]+", "", detail)
     detail = detail[:1].upper() + detail[1:]
-    severity = ("danger" if icon in _DANGER_ICONS or "T5" in title or "T6" in title
-                else "info" if icon in _INFO_ICONS else "warning")
+    severity = (
+        "danger"
+        if icon in _DANGER_ICONS or "T5" in title or "T6" in title
+        else "info"
+        if icon in _INFO_ICONS
+        else "warning"
+    )
     if not title:  # information lines have no bold title: use their first sentence
         first, _, rest = detail.partition(". ")
         title, detail = first.rstrip("."), rest

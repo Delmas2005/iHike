@@ -1,4 +1,5 @@
 """Speech to text with Whisper (faster-whisper, int8, CPU)."""
+
 from __future__ import annotations
 
 import os

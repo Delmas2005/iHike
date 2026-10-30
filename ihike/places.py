@@ -13,8 +13,29 @@ from .geo import in_europe
 
 _NUMBER = r"[-+]?\d+(?:[.,]\d+)?"
 _DMS = re.compile(r"""(\d{1,3})\s*°\s*(\d{1,2})\s*['′’]\s*(\d{1,2}(?:[.,]\d+)?)\s*(?:"|″|”|'')?\s*([NSEW])""")
-_STOPWORDS = {"de", "la", "le", "les", "du", "des", "d", "l", "the", "of", "di", "del", "della",
-              "el", "los", "las", "von", "der", "den", "im", "am"}
+_STOPWORDS = {
+    "de",
+    "la",
+    "le",
+    "les",
+    "du",
+    "des",
+    "d",
+    "l",
+    "the",
+    "of",
+    "di",
+    "del",
+    "della",
+    "el",
+    "los",
+    "las",
+    "von",
+    "der",
+    "den",
+    "im",
+    "am",
+}
 
 
 def parse_coordinates(text: str):
@@ -73,9 +94,14 @@ def search_places(text: str) -> list[tuple]:
     found = []
     try:
         resp = requests.get(
-            PHOTON_URL, timeout=15,
-            params={"q": text, "limit": 6, "lang": "en",
-                    "bbox": f"{EUROPE['min_lon']},{EUROPE['min_lat']},{EUROPE['max_lon']},{EUROPE['max_lat']}"},
+            PHOTON_URL,
+            timeout=15,
+            params={
+                "q": text,
+                "limit": 6,
+                "lang": "en",
+                "bbox": f"{EUROPE['min_lon']},{EUROPE['min_lat']},{EUROPE['max_lon']},{EUROPE['max_lat']}",
+            },
             headers=USER_AGENT,
         )
         if resp.status_code == 200:
@@ -119,13 +145,17 @@ def geocode(text: str):
 
     candidates = search_places(text)
     if not candidates:
-        raise PlannerError(f"Could not find '{text}' in Europe. Check the spelling, add the country, or use coordinates.")
+        raise PlannerError(
+            f"Could not find '{text}' in Europe. Check the spelling, add the country, or use coordinates."
+        )
     ranked = sorted(candidates, key=lambda c: -match_score(text, c[2]))  # stable: provider order breaks ties
     best = ranked[0]
     if match_score(text, best[2]) < 0.6:
         # Never route from a place that only shares one word with what was asked.
         closest = "; ".join(c[2] for c in ranked[:3])
-        raise PlannerError(f"No place really matches '{text}'. Closest results: {closest}. "
-                           "Try a more precise name, or paste coordinates.")
+        raise PlannerError(
+            f"No place really matches '{text}'. Closest results: {closest}. "
+            "Try a more precise name, or paste coordinates."
+        )
     others = [c[2] for c in ranked[1:] if c[2] != best[2]][:3]
     return best[0], best[1], best[2], others

@@ -1,4 +1,5 @@
 """Place search against simulated Photon and OpenRouteService geocoders."""
+
 from __future__ import annotations
 
 import pytest
