@@ -1,0 +1,13 @@
+# CPU builds of PyTorch (the Space has no GPU): much smaller than the default CUDA build
+--extra-index-url https://download.pytorch.org/whl/cpu
+requests
+pandas
+folium
+defusedxml
+pillow
+python-multipart
+huggingface_hub
+# In-Space AI: speech to text, and plants/animals in photos
+faster-whisper
+torch
+open_clip_torch
