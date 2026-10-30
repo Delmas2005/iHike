@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# Tooling caches and reports
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Runtime data written by the app (synced to the HF dataset, never to Git)
+data/
+pending_photos/
+flagged/
+.gradio/
+
+# Model caches and large local files
+*.pt
+*.bin
+*.safetensors
+*.onnx
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Misc
+node_modules/
+*.zip
+*.log
