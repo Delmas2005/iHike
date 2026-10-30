@@ -2,32 +2,32 @@
 
 iHike suggests real hikes anywhere in Europe from a start point, a destination, or a sentence (typed or spoken). It runs as one Python web server on a Hugging Face Space (CPU only) and leans on free public map, routing and weather services.
 
-This document describes the code as of the import into Git (October 2026). Known problems are listed separately in [AUDIT.md](AUDIT.md).
+This document describes the code after the Phase 1 restructuring (October 2026). Known problems are listed separately in [AUDIT.md](AUDIT.md).
 
 ## Modules
 
-| File | Lines | Role |
-|---|---|---|
-| `app.py` | ~210 | FastAPI server. Serves the interface, the JSON API and community photos. Maps engine errors to HTTP status codes. Starts Uvicorn on port 7860. |
-| `engine.py` | ~1,450 | Everything that is not interface: place search, routing, hike ideas, weather, alerts, recommendation, LLM briefing, GPX, community storage and photo storage. Also builds the JSON sent to the browser. |
-| `ai.py` | ~400 | Models that run inside the Space: speech to text (faster-whisper), plants and animals in photos (BioCLIP via open_clip), and the request reader (`parse_request` rules, `_llm_parse`, `_clean`, `understand`). |
-| `static/index.html`, `static/app.js`, `static/styles.css` | ~1,700 | The main interface: vanilla JavaScript, no build step. 3D relief map with MapLibre GL and contour lines with maplibre-contour (both vendored in `static/vendor/`). |
+| Path | Role |
+|---|---|
+| `app.py` | Entry point of the Space: starts Uvicorn on `GRADIO_SERVER_PORT` (7860). |
+| `ihike/web.py` | FastAPI app. Serves the interface, the JSON API and community photos; maps planning errors to HTTP status codes; prepares the community store at start-up. |
+| `ihike/config.py`, `ihike/errors.py` | Settings read from the environment, service URLs, constants; `PlannerError` (a message meant for the user). |
+| `ihike/ai/` | Models that run inside the Space: `speech.py` (faster-whisper), `species.py` (BioCLIP via open_clip), `parsing.py` (the request reader: `parse_request` rules, `_llm_parse`, `_clean`, `understand`). |
+| `static/index.html`, `static/app.js`, `static/styles.css` | The interface: vanilla JavaScript, no build step. 3D relief map with MapLibre GL and contour lines with maplibre-contour (both vendored in `static/vendor/`). |
 
-### Inside `engine.py`
+### Planning modules (`ihike/`), in the order a request uses them
 
-The file is organised in numbered steps that follow a request:
+1. **`places.py`** (`parse_coordinates`, `search_places`, `match_score`, `geocode`): coordinates in many formats, or a name searched with Photon then the OpenRouteService geocoder. A result that matches less than 60 % of the query's words is refused rather than used.
+2. **`routing.py`** (`ors_route`, `brouter_route`, `plan_variants`): OpenRouteService `foot-hiking` with elevation and trail difficulty. When it stops more than 300 m short of a destination (it refuses paths graded T5/T6), BRouter's alpine profile is tried.
+3. **`osm.py`** and **`ideas.py`** (`find_goals_and_trails`, `pick_goals`, `marked_loops`, `suggest_hikes`): one Overpass query lists named summits, passes, lakes, huts, viewpoints, waterfalls and waymarked trails around the start; the ones whose round trip fits the requested time and level are routed.
+4. **Car parks** (`osm.find_trailheads`, `ideas.plan_from_car_parks`): trailheads and public car parks from Overpass, used to suggest starts and to plan from a destination alone (easiest, medium, hardest).
+5. **`weather.py`** and **`alerts.py`** (`get_weather`, `weather_alerts`, `terrain_alerts`, `alert_data`): Open-Meteo daily forecast at the highest point of the routes; alert rules on storms, snow, ice, rain, wind, heat, frost, daylight, path grade, altitude and routes that stop short.
+6. **`advice.py`** (`suits`, `recommend`, `ai_briefing`, `fallback_briefing`): level limits (beginner up to T2, regular up to T3, seasoned up to T4; T5/T6 never recommended), then an LLM paragraph or a template.
+7. **`planner.py`** (`plan_hikes`, `plan_data`, `track_data`, `config_status`): orchestration and the JSON sent to the browser.
+8. **`community.py`** (`init_storage`, `save_photo`, `publish_photos`, `track_from_geometry`, `share_track`, `public_hike`, `load_hikes`, `save_hike`) and **`gpx.py`** (`write_gpx`, `parse_gpx`).
 
-1. **Places** (`parse_coordinates`, `search_places`, `match_score`, `geocode`): coordinates in many formats, or a name searched with Photon then the OpenRouteService geocoder. A result that matches less than 60 % of the query's words is refused rather than used.
-2. **Routes** (`ors_route`, `brouter_route`, `plan_variants`): OpenRouteService `foot-hiking` with elevation and trail difficulty. When it stops more than 300 m short of a destination (it refuses paths graded T5/T6), BRouter's alpine profile is tried.
-3. **Hike ideas** (`find_goals_and_trails`, `pick_goals`, `stitch_ways`, `marked_loops`, `suggest_hikes`): one Overpass query lists named summits, passes, lakes, huts, viewpoints, waterfalls and waymarked trails around the start; the ones whose round trip fits the requested time and level are routed.
-4. **Car parks** (`find_trailheads`, `plan_from_car_parks`): trailheads and public car parks from Overpass, used to suggest starts and to plan from a destination alone (easiest, medium, hardest).
-5. **Weather and alerts** (`get_weather`, `weather_alerts`, `terrain_alerts`): Open-Meteo daily forecast at the highest point of the routes; alert rules on storms, snow, ice, rain, wind, heat, frost, daylight, path grade, altitude and routes that stop short.
-6. **Recommendation and briefing** (`suits`, `recommend`, `ai_briefing`, `fallback_briefing`): level limits (beginner up to T2, regular up to T3, seasoned up to T4; T5/T6 never recommended), then an LLM paragraph or a template.
-7. **Orchestration and JSON** (`plan_hikes`, `plan_data`, `track_data`, `alert_data`).
-8. **Community** (`save_photo`, `publish_photos`, `track_from_geometry`, `share_track`, `public_hike`, `load_hikes`, `save_hike`).
+`geo.py` holds the shared physical model: `estimate_hours()` (a DIN 33466-style rule: the longer of horizontal and vertical time plus half the shorter, with per-level speeds), `climb()` (ascent with a 5 m noise threshold), effort-km (distance + 1 km per 100 m of ascent), `grade_for()`, `haversine_km()` and `stitch_ways()`.
 
-Shared physical model: `estimate_hours()` (a DIN 33466-style rule: the longer of horizontal and vertical time plus half the shorter, with per-level speeds), `climb()` (ascent with a 5 m noise threshold), effort-km (distance + 1 km per 100 m of ascent) and `grade_for()`.
-
+Importing the package has no side effects: folders and the dataset sync are set up by `community.init_storage()` when the server starts.
 ## Request flows
 
 ```mermaid
@@ -35,13 +35,13 @@ flowchart LR
   subgraph Browser
     UI[static/app.js]
   end
-  subgraph Space["Hugging Face Space (app.py)"]
+  subgraph Space["Hugging Face Space (ihike/web.py)"]
     ASK["/api/ask"] --> UND[ai.understand]
     VOICE["/api/voice"] --> TR[ai.transcribe]
-    PLAN["/api/plan"] --> PH[engine.plan_hikes]
-    PHOTO["/api/photos"] --> SP[engine.save_photo] --> ID[ai.identify]
-    SHARE["/api/share, /api/import"] --> ST[engine.share_track]
-    TH["/api/trailheads"] --> FT[engine.find_trailheads]
+    PLAN["/api/plan"] --> PH[planner.plan_hikes]
+    PHOTO["/api/photos"] --> SP[community.save_photo] --> ID[ai.identify]
+    SHARE["/api/share, /api/import"] --> ST[community.share_track]
+    TH["/api/trailheads"] --> FT[osm.find_trailheads]
   end
   UI --> ASK & VOICE & PLAN & PHOTO & SHARE & TH
   UND -. optional .-> HFI[HF Inference Providers]
@@ -64,7 +64,7 @@ flowchart LR
 2. `ai.transcribe()` loads faster-whisper (`base`, int8, CPU) on first use and transcribes. One lock serialises all transcriptions.
 3. The browser puts the text in the search bar and continues as a typed request.
 
-### Planning (`POST /api/plan` → `engine.plan_hikes`)
+### Planning (`POST /api/plan` → `planner.plan_hikes`)
 
 1. **Start**: `geocode()` the start, unless the mode is a destination trip with no start.
 2. **Destination** (trip modes): `geocode()` it.
@@ -123,4 +123,4 @@ All configuration comes from environment variables; see [`.env.example`](../.env
 
 ## Deployment
 
-The Space uses the `gradio` SDK (`sdk_version: 5.49.1` in `README.md`) and runs `python app.py`. The code no longer imports Gradio: `app.py` starts its own Uvicorn server on `GRADIO_SERVER_PORT` (7860). The original Gradio interface (`classic.py`) was removed after the import; see the changelog.
+The Space uses the `gradio` SDK (`sdk_version: 5.49.1` in `README.md`) and runs `python app.py`. The code does not import Gradio: `app.py` starts its own Uvicorn server on `GRADIO_SERVER_PORT` (7860). The original Gradio interface (`classic.py`) was removed after the import; see the changelog.

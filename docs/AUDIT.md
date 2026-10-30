@@ -19,13 +19,13 @@ Priorities:
 
 ## P1
 
-5. **`transcribe()` and `identify()` raise instead of degrading.** The module docstring of `ai.py` promises graceful degradation, but both functions raise if their library is missing or the model cannot be downloaded. `app.py` catches it today (it checks `available()` first and wraps the calls), so the app does not crash, but the contract is broken and the user only gets a generic message. `available()` only checks that the package is installed, not that the model loads. *Phase 3, with tests in Phase 2.*
+5. **`transcribe()` and `identify()` raise instead of degrading.** The module docstring of the old `ai.py` promised graceful degradation, but both functions raise if their library is missing or the model cannot be downloaded. The web layer catches it today (it checks `available()` first and wraps the calls), so the app does not crash, but the contract is broken and the user only gets a generic message. `available()` only checks that the package is installed, not that the model loads. *Phase 3, with tests in Phase 2.*
 
 6. **A network failure is reported as "place not found".** With Photon unreachable, `POST /api/plan {"start": "Chamonix"}` answers `400 Could not find 'Chamonix' in Europe` (observed in the local run: Photon refused, ORS geocoder disabled without a key). `search_places` swallows every exception and returns an empty list. *Phase 3: distinguish "unavailable" (503) from "not found" (400).*
 
 7. **No retry with backoff on any external call, and a very long worst case.** Each call has a timeout, but failures are not retried (except trying the next Overpass mirror), and timeouts add up: in the worst case one `/api/plan` waits roughly 15 min (Photon 15 s, ORS geocoder 20 s, 4 Overpass mirrors × 35 s, 7 ORS routes × 2 × 45 s, Open-Meteo, LLM 60 s). There is no overall deadline. Typical requests take 5 to 20 s. *Phase 3: retries with backoff, an overall time budget, Phase 6: parallel calls and caching.*
 
-8. **Request reader errors found in a quick probe** (`ai.understand`, rules only):
+8. **Request reader errors found in a quick probe** (`ihike.ai.understand`, rules only):
 
    | Input | Result | Problem |
    |---|---|---|
@@ -41,7 +41,7 @@ Priorities:
 
 9. **Models load inside the request lock.** The first voice request or photo after a restart downloads and loads the model (hundreds of MB) while holding the lock; every other request of that kind waits, and the browser request can time out. *Phase 6: warm-up at start-up.*
 
-10. **`engine.py` does work at import time.** Importing it creates folders, downloads the community dataset and starts a background `CommitScheduler` when the secrets are set. This makes tests depend on the environment and slows start-up. *Phase 1/2, after the refactoring proposal.*
+10. ~~**`engine.py` does work at import time.**~~ Fixed: importing `ihike` has no side effects; `community.init_storage()` runs when the server starts (tested in `tests/integration/test_startup.py`).
 
 11. **Server date versus user date.** `day` is an index from "today" on the server (UTC on the Space). Around midnight in Europe, "today" in the browser and on the server differ by one day. *Phase 3.*
 
@@ -49,13 +49,13 @@ Priorities:
 
 12. **Dependencies are not pinned.** `requirements.txt` lists names only (`torch`, `gradio` via the SDK, etc.), so two builds of the Space can differ. *Phase 1: `pyproject.toml` with ranges, generated pinned `requirements.txt`.*
 
-13. **`engine.py` is 1,450 lines with eight responsibilities.** Places, routing, Overpass, weather, recommendation, LLM briefing, JSON shaping and storage share one module and its global state. *Refactoring proposal before Phase 1; nothing moves without approval.*
+13. ~~**`engine.py` is 1,450 lines with eight responsibilities.**~~ Split into the `ihike/` package (13 modules plus `ihike/ai/`), code moved without changes in behaviour.
 
 14. ~~**`classic.py` duplicates presentation logic.**~~ Removed: the Gradio fallback is gone, with Folium and pandas.
 
 15. **Logging is `print()`.** 14 calls across the modules, no levels, no request context. *Phase 3: `logging` with levels, no personal data (no coordinates of users' homes, no free text).*
 
-16. **No automated tests in the repository.** A ~700-line test script exists from development (simulated services, browser checks) but was not part of the Space. *Phase 2: rewrite as a pytest suite under `tests/`.*
+16. **No automated tests in the repository.** Partly fixed: a first pytest suite (95 tests, all external services simulated) is in `tests/`. *Phase 2: coverage targets and the remaining cases.*
 
 17. **Privacy of shared GPX tracks.** A track recorded from home publishes its start and end point. The interface warns, but does not trim. *Possible feature: hide the first and last few hundred metres, as tracking apps do.*
 
