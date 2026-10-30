@@ -13,11 +13,11 @@ $(BIN)/python:
 
 install: $(BIN)/python  ## Create .venv with the app and the dev tools, install the git hooks
 	$(BIN)/python -m pip install --upgrade pip
-	$(BIN)/python -m pip install -e ".[dev]"
+	$(BIN)/python -m pip install -e ".[dev]" -c requirements.txt  # same versions as the Space
 	$(BIN)/pre-commit install
 
 install-ai: install  ## Also install the in-Space models' libraries (CPU PyTorch, about 1 GB)
-	$(BIN)/python -m pip install -e ".[ai]" --extra-index-url https://download.pytorch.org/whl/cpu
+	$(BIN)/python -m pip install -e ".[ai]" -c requirements.txt
 
 run:  ## Serve the app on http://localhost:7860 (reads .env if present)
 	@if [ -f .env ]; then set -a; . ./.env; set +a; fi; $(BIN)/python app.py
